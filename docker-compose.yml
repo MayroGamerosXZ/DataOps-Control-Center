@@ -1,0 +1,139 @@
+version: '3.8'
+
+# 1. DEFINICIÓN DE REDES
+# Creamos una red privada para que todos los contenedores se comuniquen entre sí
+networks:
+  dataops_net:
+    driver: bridge
+
+# 2. DEFINICIÓN DE VOLÚMENES
+# Esto asegura que los datos no se borren cuando apagues los contenedores
+volumes:
+  pg_control_data:
+  pg_test_data:
+  sqlserver_data:
+  # --- BLOQUE ACTUALIZADO: Nuevos volúmenes ---
+  prometheus_data:
+  grafana_data:
+
+# 3. SERVICIOS (CONTENEDORES)
+services:
+
+  # --- A. MOTOR DE CONTROL (POSTGRESQL) ---
+  # Aquí guardaremos las tablas del sistema (CONNECTIONS, DB_METRICS, etc.)
+  pg-control:
+    image: postgres:15-alpine
+    container_name: db_control_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: MayroGameros
+      POSTGRES_PASSWORD: Robin1710
+      POSTGRES_DB: dataops_control_db
+    ports:
+      - "5432:5432" # Puerto por defecto para Postgres
+    networks:
+      - dataops_net
+    volumes:
+      - pg_control_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G # Límite de 1GB de RAM
+
+  # --- B. MOTOR DE PRUEBAS 1 (POSTGRESQL) ---
+  # Este es un motor "paciente" que nuestra plataforma va a monitorear
+  pg-test:
+    image: postgres:15-alpine
+    container_name: db_test_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin_test
+      POSTGRES_PASSWORD: DataOpsTest123!
+      POSTGRES_DB: test_company_db
+    ports:
+      - "5433:5432" # Mapeado al puerto 5433 de tu PC para evitar choque con el de control
+    networks:
+      - dataops_net
+    volumes:
+      - pg_test_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # --- C. MOTOR DE PRUEBAS 2 (SQL SERVER) ---
+  # Otro "paciente" a monitorear. Requiere contraseña fuerte por defecto.
+  sqlserver-test:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: db_test_sqlserver
+    restart: always
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "SqlServerTest123!" # Debe tener mayúsculas, minúsculas, números y símbolos
+    ports:
+      - "1433:1433" # Puerto por defecto de SQL Server
+    networks:
+      - dataops_net
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    deploy:
+      resources:
+        limits:
+          memory: 2G # SQL Server es pesado, le damos 2GB de RAM
+
+
+  # ====================================================================
+  # --- BLOQUE ACTUALIZADO: SERVICIOS AUXILIARES ---
+  # ====================================================================
+
+  # --- D. CACHÉ (REDIS) ---
+  # Acelerará las consultas lentas de nuestra API
+  redis-cache:
+    image: redis:7-alpine
+    container_name: dataops_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - dataops_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M # Redis es muy ligero
+
+  # --- E. RECOLECTOR DE MÉTRICAS (PROMETHEUS) ---
+  # Extraerá el uso de CPU y memoria de los contenedores
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dataops_prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    networks:
+      - dataops_net
+    volumes:
+      - prometheus_data:/prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # --- F. DASHBOARD OPERATIVO (GRAFANA) ---
+  # Interfaz gráfica para visualizar lo que recolecta Prometheus
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dataops_grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=Mayro
+      - GF_SECURITY_ADMIN_PASSWORD=Robin302019
+    networks:
+      - dataops_net
+    volumes:
+      - grafana_data:/var/lib/grafana
+    deploy:
+      resources:
+        limits:
+          memory: 512M
