@@ -12,9 +12,10 @@ volumes:
   pg_control_data:
   pg_test_data:
   sqlserver_data:
-  # --- BLOQUE ACTUALIZADO: Nuevos volúmenes ---
   prometheus_data:
   grafana_data:
+  # --- BLOQUE ACTUALIZADO: Volumen para el Nodo Esclavo ---
+  pg_replica_data:
 
 # 3. SERVICIOS (CONTENEDORES)
 services:
@@ -39,6 +40,7 @@ services:
       resources:
         limits:
           memory: 1G # Límite de 1GB de RAM
+
 
   # --- B. MOTOR DE PRUEBAS 1 (POSTGRESQL) ---
   # Este es un motor "paciente" que nuestra plataforma va a monitorear
@@ -83,7 +85,7 @@ services:
 
 
   # ====================================================================
-  # --- BLOQUE ACTUALIZADO: SERVICIOS AUXILIARES ---
+  # --- SERVICIOS AUXILIARES ---
   # ====================================================================
 
   # --- D. CACHÉ (REDIS) ---
@@ -137,3 +139,28 @@ services:
       resources:
         limits:
           memory: 512M
+
+  # ====================================================================
+  # --- BLOQUE ACTUALIZADO: FASE 4 - MÓDULO 6 (ALTA DISPONIBILIDAD) ---
+  # ====================================================================
+
+  # --- G. NODO ESCLAVO (NODO DE RÉPLICA) ---
+  # Base de datos destino para demostrar la replicación distribuida de datos
+  postgres-replica:
+    image: postgres:15-alpine
+    container_name: postgres_replica
+    restart: always
+    environment:
+      POSTGRES_USER: MayroGameros
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: replica_db
+    ports:
+      - "5434:5432" # Mapeado al puerto 5434 de tu PC para no interferir con los puertos 5432 ni 5433
+    networks:
+      - dataops_net
+    volumes:
+      - pg_replica_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M # Asignación balanceada para la réplica
