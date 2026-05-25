@@ -46,7 +46,12 @@ function App() {
         ? await axios.post(`http://localhost:8000${endpoint}`)
         : await axios.get(`http://localhost:8000${endpoint}`);
 
-      const successMsg = response.data.message || "Operación procesada con éxito.";
+      // Modificamos ligeramente para extraer detalles si el backend los envía (como el Hash MD5 o RTO/RPO)
+      let successMsg = response.data.message || "Operación procesada con éxito.";
+      if (response.data.details) {
+         successMsg += ` | Detalles: ${JSON.stringify(response.data.details)}`;
+      }
+
       setStatusMessage(`[ÉXITO - ${moduleName}]: ${successMsg}`);
     } catch (error) {
       setStatusMessage(`[ERROR - ${moduleName}]: Falló la ejecución. Verifica que la ruta exista en Swagger.`);
@@ -156,14 +161,25 @@ function App() {
                   </Button>
                 </Grid>
                 <Grid item xs={12} sm={6}>
+                  {/* El botón de backup ya apunta a nuestra nueva ruta dinámica */}
                   <Button fullWidth variant="contained" color="success" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/api/backups/full/1', 'POST', 'Backups Azure')}>
                     4. Forzar Backup
                   </Button>
                 </Grid>
-                {/* NUEVO BOTÓN FASE B: FORZAR DEADLOCK */}
                 <Grid item xs={12}>
                   <Button fullWidth variant="contained" color="error" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/api/queries/deadlock', 'POST', 'Forzar Deadlock')}>
                     5. Forzar Deadlock (Choque Transaccional)
+                  </Button>
+                </Grid>
+                {/* NUEVOS BOTONES FASE C: DISASTER RECOVERY */}
+                <Grid item xs={12} sm={6}>
+                  <Button fullWidth variant="contained" sx={{ bgcolor: '#9f1239', '&:hover': { bgcolor: '#be123c' }, fontWeight: 'bold' }} size="large" onClick={() => executeCommand('/api/disaster/drop-table', 'POST', 'Simular Desastre')}>
+                    6. DROP TABLE (Desastre)
+                  </Button>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Button fullWidth variant="contained" sx={{ bgcolor: '#0284c7', '&:hover': { bgcolor: '#0369a1' }, fontWeight: 'bold' }} size="large" onClick={() => executeCommand('/api/disaster/restore', 'POST', 'Protocolo Recovery')}>
+                    7. Restaurar (RTO/RPO)
                   </Button>
                 </Grid>
               </Grid>
