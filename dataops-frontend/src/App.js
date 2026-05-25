@@ -160,6 +160,12 @@ function App() {
                     4. Forzar Backup
                   </Button>
                 </Grid>
+                {/* NUEVO BOTÓN FASE B: FORZAR DEADLOCK */}
+                <Grid item xs={12}>
+                  <Button fullWidth variant="contained" color="error" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/api/queries/deadlock', 'POST', 'Forzar Deadlock')}>
+                    5. Forzar Deadlock (Choque Transaccional)
+                  </Button>
+                </Grid>
               </Grid>
 
               {/* CONSOLA DE REGISTROS */}
