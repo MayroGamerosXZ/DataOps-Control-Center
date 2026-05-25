@@ -113,3 +113,26 @@ async def get_connection_logs():
     except Exception as e:
         return {"status": "error", "message": f"Error al consultar la base de datos: {str(e)}"}
 
+
+"Endpoint para Consultas Lentas"
+@app.get("/api/queries/slow-logs")
+async def get_slow_queries_logs():
+    """
+    Retorna las consultas lentas o de alto impacto detectadas
+    durante las simulaciones de estrés.
+    """
+    try:
+        # Aquí mapeas la consulta a tu tabla de métricas de queries, por ejemplo:
+        # slow_queries = db.query(QueryMetricModel).filter(QueryMetricModel.duration > 1.5).all()
+
+        # Estructura de datos que tu tabla de React formateará automáticamente:
+        slow_queries_db = [
+            {"id": 101, "db_id": 1, "query": "SELECT * FROM orders o JOIN users u ON o.user_id = u.id WHERE o.total > 5000;", "duracion_seg": 3.42, "hilos_concurrentes": 100, "fecha": "2026-05-24 19:50:22"},
+            {"id": 102, "db_id": 1, "query": "SELECT SUM(stock) FROM inventory GROUP BY category_id, provider_id, location_id;", "duracion_seg": 2.15, "hilos_concurrentes": 100, "fecha": "2026-05-24 19:50:24"},
+            {"id": 103, "db_id": 1, "query": "UPDATE products SET price = price * 1.05 WHERE status = 'active';", "duracion_seg": 1.89, "hilos_concurrentes": 50, "fecha": "2026-05-24 19:51:05"}
+        ]
+        return {"status": "success", "records": slow_queries_db}
+
+    except Exception as e:
+        return {"status": "error", "message": f"Error al extraer metricas de rendimiento: {str(e)}"}
+
