@@ -27,13 +27,11 @@ function App() {
   const [tableData, setTableData] = useState([]);
   const [tableTitle, setTableTitle] = useState("");
 
-  // MONITOREO PASIVO (Polling temporalmente desactivado hasta que se cree el GET /api/alerts/count en Python)
-  // Se mantiene la estructura para el futuro.
   useEffect(() => {
-    // Cuando crees la ruta GET de alertas en Python, descomenta la lógica interior.
+    // Espacio reservado para el Polling de alertas futuras
   }, []);
 
-  // Función genérica para Botones de Acción (POST / GET)
+  // Función genérica para Botones de Acción
   const executeCommand = async (endpoint, method = 'GET', moduleName) => {
     setStatusMessage(`[${moduleName}] Iniciando proceso...`);
     try {
@@ -49,16 +47,28 @@ function App() {
     }
   };
 
-  // NUEVA FUNCIÓN: Extraer datos y mapearlos dinámicamente en la tabla
+  // FUNCIÓN BLINDADA: Extraer datos y forzar Array para evitar crasheos (tableData.slice)
   const loadLogsToTable = async (endpoint, title) => {
     setStatusMessage(`[Consulta] Extrayendo registros: ${title}...`);
     try {
       const response = await axios.get(`http://localhost:8000${endpoint}`);
-      const records = response.data.records || response.data || [];
 
-      setTableData(records);
+      // Extraemos la información sin importar cómo la envíe Python
+      let rawData = response.data.records || response.data.data || response.data;
+      let finalRecords = [];
+
+      // RED DE SEGURIDAD: Garantizamos que siempre sea una lista (Array)
+      if (Array.isArray(rawData)) {
+        finalRecords = rawData;
+      } else if (typeof rawData === 'object' && rawData !== null) {
+        finalRecords = [rawData]; // Envolvemos el objeto único en una lista
+      } else {
+        finalRecords = [{ valor: rawData }]; // Por si Python manda solo un texto plano
+      }
+
+      setTableData(finalRecords);
       setTableTitle(title);
-      setStatusMessage(`[ÉXITO]: Datos cargados correctamente (${records.length} registros).`);
+      setStatusMessage(`[ÉXITO]: Datos cargados correctamente (${finalRecords.length} registros).`);
     } catch (error) {
       setStatusMessage(`[ERROR]: Ruta no encontrada. Asegúrate de haber programado este GET en FastAPI.`);
       setTableData([]);
@@ -98,7 +108,7 @@ function App() {
         </Box>
 
         <Grid container spacing={4}>
-          {/* SECCIÓN IZQUIERDA: MANDOS DE CONTROL */}
+          {/* SECCIÓN IZQUIERDA */}
           <Grid item xs={12} md={6}>
             <Paper elevation={6} sx={{ p: 4, borderRadius: 3, height: '100%' }}>
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
@@ -137,7 +147,7 @@ function App() {
             </Paper>
           </Grid>
 
-          {/* SECCIÓN DERECHA: AUDITORÍA DE TABLAS */}
+          {/* SECCIÓN DERECHA */}
           <Grid item xs={12} md={6}>
             <Paper elevation={6} sx={{ p: 4, borderRadius: 3, height: '100%', bgcolor: '#1e293b' }}>
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
@@ -146,7 +156,6 @@ function App() {
 
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={12} sm={6}>
-                  {/* Este botón usa la única ruta GET disponible en tu Swagger para demostrar la tabla */}
                   <Button fullWidth variant="outlined" color="primary" onClick={() => loadLogsToTable('/api/cache/transactions/1', 'Transacciones en Caché')}>
                     Ver Logs de Caché
                   </Button>
