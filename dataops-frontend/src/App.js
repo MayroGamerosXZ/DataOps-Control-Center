@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Container, Typography, Box, Button, Paper, Grid,
   ThemeProvider, createTheme, CssBaseline,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Badge, IconButton
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Badge, IconButton,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem
 } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import axios from 'axios';
@@ -27,6 +28,12 @@ function App() {
   const [tableData, setTableData] = useState([]);
   const [tableTitle, setTableTitle] = useState("");
 
+  // Estados para el Modal de Registro
+  const [openModal, setOpenModal] = useState(false);
+  const [formData, setFormData] = useState({
+    engine: 'PostgreSQL', host: '', port: '', username: '', password: ''
+  });
+
   useEffect(() => {
     // Espacio reservado para el Polling de alertas futuras
   }, []);
@@ -47,23 +54,21 @@ function App() {
     }
   };
 
-  // FUNCIÓN BLINDADA: Extraer datos y forzar Array para evitar crasheos (tableData.slice)
+  // FUNCIÓN BLINDADA: Extraer datos y forzar Array para evitar crasheos
   const loadLogsToTable = async (endpoint, title) => {
     setStatusMessage(`[Consulta] Extrayendo registros: ${title}...`);
     try {
       const response = await axios.get(`http://localhost:8000${endpoint}`);
 
-      // Extraemos la información sin importar cómo la envíe Python
       let rawData = response.data.records || response.data.data || response.data;
       let finalRecords = [];
 
-      // RED DE SEGURIDAD: Garantizamos que siempre sea una lista (Array)
       if (Array.isArray(rawData)) {
         finalRecords = rawData;
       } else if (typeof rawData === 'object' && rawData !== null) {
-        finalRecords = [rawData]; // Envolvemos el objeto único en una lista
+        finalRecords = [rawData];
       } else {
-        finalRecords = [{ valor: rawData }]; // Por si Python manda solo un texto plano
+        finalRecords = [{ valor: rawData }];
       }
 
       setTableData(finalRecords);
@@ -78,6 +83,18 @@ function App() {
   // Acción interactiva para la campana de notificaciones
   const handleBellClick = () => {
     executeCommand('/api/alerts/scan/1', 'POST', 'Escaneo de Alertas');
+  };
+
+  // Función para enviar el formulario de registro al backend
+  const handleRegisterSubmit = async () => {
+    setStatusMessage(`[Registro] Guardando nuevo motor ${formData.engine}...`);
+    try {
+      const response = await axios.post('http://localhost:8000/api/connections/register', formData);
+      setStatusMessage(`[ÉXITO]: ${response.data.message}`);
+      setOpenModal(false); // Cierra el modal
+    } catch (error) {
+      setStatusMessage(`[ERROR]: No se pudo registrar el motor.`);
+    }
   };
 
   return (
@@ -111,9 +128,16 @@ function App() {
           {/* SECCIÓN IZQUIERDA */}
           <Grid item xs={12} md={6}>
             <Paper elevation={6} sx={{ p: 4, borderRadius: 3, height: '100%' }}>
-              <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-                Orquestación de Infraestructura
-              </Typography>
+
+              {/* Título alineado con el botón de Añadir Motor */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                  Orquestación de Infraestructura
+                </Typography>
+                <Button variant="outlined" color="primary" onClick={() => setOpenModal(true)} sx={{ fontWeight: 'bold' }}>
+                  + Añadir Motor
+                </Button>
+              </Box>
 
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
@@ -200,6 +224,37 @@ function App() {
             </Paper>
           </Grid>
         </Grid>
+
+        {/* MODAL FLOTANTE DE REGISTRO */}
+        <Dialog open={openModal} onClose={() => setOpenModal(false)} PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc' } }}>
+          <DialogTitle sx={{ color: '#22c55e', fontWeight: 'bold' }}>Registrar Nuevo Motor de BD</DialogTitle>
+          <DialogContent>
+            <TextField select fullWidth margin="dense" label="Motor de Base de Datos"
+              value={formData.engine} onChange={(e) => setFormData({...formData, engine: e.target.value})}
+              sx={{ input: { color: 'white' }, label: { color: '#94a3b8' }, bgcolor: '#0f172a', mt: 2 }}
+            >
+              <MenuItem value="PostgreSQL">PostgreSQL</MenuItem>
+              <MenuItem value="SQL Server">SQL Server</MenuItem>
+              <MenuItem value="Oracle">Oracle DB</MenuItem>
+            </TextField>
+            <TextField fullWidth margin="dense" label="Host (IP o URL)" placeholder="ej. 192.168.1.100"
+              onChange={(e) => setFormData({...formData, host: e.target.value})}
+              InputProps={{ style: { color: 'white' } }} InputLabelProps={{ style: { color: '#94a3b8' } }} sx={{ bgcolor: '#0f172a', mt: 2 }} />
+            <TextField fullWidth margin="dense" label="Puerto" placeholder="ej. 5432"
+              onChange={(e) => setFormData({...formData, port: e.target.value})}
+              InputProps={{ style: { color: 'white' } }} InputLabelProps={{ style: { color: '#94a3b8' } }} sx={{ bgcolor: '#0f172a', mt: 2 }} />
+            <TextField fullWidth margin="dense" label="Usuario"
+              onChange={(e) => setFormData({...formData, username: e.target.value})}
+              InputProps={{ style: { color: 'white' } }} InputLabelProps={{ style: { color: '#94a3b8' } }} sx={{ bgcolor: '#0f172a', mt: 2 }} />
+            <TextField fullWidth margin="dense" label="Contraseña" type="password"
+              onChange={(e) => setFormData({...formData, password: e.target.value})}
+              InputProps={{ style: { color: 'white' } }} InputLabelProps={{ style: { color: '#94a3b8' } }} sx={{ bgcolor: '#0f172a', mt: 2 }} />
+          </DialogContent>
+          <DialogActions sx={{ p: 3 }}>
+            <Button onClick={() => setOpenModal(false)} sx={{ color: '#94a3b8' }}>Cancelar</Button>
+            <Button onClick={handleRegisterSubmit} variant="contained" color="primary">Guardar Motor</Button>
+          </DialogActions>
+        </Dialog>
 
       </Container>
     </ThemeProvider>
