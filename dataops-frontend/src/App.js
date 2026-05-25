@@ -156,8 +156,8 @@ function App() {
 
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="outlined" color="primary" onClick={() => loadLogsToTable('/api/cache/transactions/1', 'Transacciones en Caché')}>
-                    Ver Logs de Caché
+                  <Button fullWidth variant="outlined" color="primary" onClick={() => loadLogsToTable('/api/connections/logs', 'Historial Health Check')}>
+                    Ver Historial Salud
                   </Button>
                 </Grid>
                 <Grid item xs={12} sm={6}>
