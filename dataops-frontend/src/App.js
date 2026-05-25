@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Container, Typography, Box, Button, Paper, Grid,
   ThemeProvider, createTheme, CssBaseline,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Badge
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Badge, IconButton
 } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import axios from 'axios';
@@ -27,21 +27,10 @@ function App() {
   const [tableData, setTableData] = useState([]);
   const [tableTitle, setTableTitle] = useState("");
 
-  // MONITOREO EN VIVO: Consulta automática al backend cada 10 segundos
+  // MONITOREO PASIVO (Polling temporalmente desactivado hasta que se cree el GET /api/alerts/count en Python)
+  // Se mantiene la estructura para el futuro.
   useEffect(() => {
-    const fetchAlertsActive = async () => {
-      try {
-        // NOTA: Ajusta '/api/alerts/count' a tu ruta exacta de FastAPI para conteo de alertas
-        const response = await axios.get('http://localhost:8000/api/alerts/count');
-        setAlertsCount(response.data.count || 0);
-      } catch (error) {
-        console.log("Monitoreo pasivo: Esperando sincronización con el módulo de alertas.");
-      }
-    };
-
-    fetchAlertsActive();
-    const interval = setInterval(fetchAlertsActive, 10000);
-    return () => clearInterval(interval);
+    // Cuando crees la ruta GET de alertas en Python, descomenta la lógica interior.
   }, []);
 
   // Función genérica para Botones de Acción (POST / GET)
@@ -55,26 +44,30 @@ function App() {
       const successMsg = response.data.message || "Operación procesada con éxito.";
       setStatusMessage(`[ÉXITO - ${moduleName}]: ${successMsg}`);
     } catch (error) {
-      setStatusMessage(`[ERROR - ${moduleName}]: Falló la ejecución de la tarea externa.`);
+      setStatusMessage(`[ERROR - ${moduleName}]: Falló la ejecución. Verifica que la ruta exista en Swagger.`);
       console.error(error);
     }
   };
 
   // NUEVA FUNCIÓN: Extraer datos y mapearlos dinámicamente en la tabla
   const loadLogsToTable = async (endpoint, title) => {
-    setStatusMessage(`[Consulta] Extrayendo registros desde la base de datos de control...`);
+    setStatusMessage(`[Consulta] Extrayendo registros: ${title}...`);
     try {
       const response = await axios.get(`http://localhost:8000${endpoint}`);
-      // Detecta automáticamente si tu API responde con una lista directa o un objeto con records
       const records = response.data.records || response.data || [];
 
       setTableData(records);
       setTableTitle(title);
-      setStatusMessage(`[ÉXITO]: Datos cargados correctamente para: ${title}.`);
+      setStatusMessage(`[ÉXITO]: Datos cargados correctamente (${records.length} registros).`);
     } catch (error) {
-      setStatusMessage(`[ERROR]: No se pudo formatear el log de datos solicitado.`);
+      setStatusMessage(`[ERROR]: Ruta no encontrada. Asegúrate de haber programado este GET en FastAPI.`);
       setTableData([]);
     }
+  };
+
+  // Acción interactiva para la campana de notificaciones
+  const handleBellClick = () => {
+    executeCommand('/api/alerts/scan/1', 'POST', 'Escaneo de Alertas');
   };
 
   return (
@@ -82,7 +75,7 @@ function App() {
       <CssBaseline />
       <Container maxWidth="lg" sx={{ pb: 6 }}>
 
-        {/* ENCABEZADO PRINCIPAL CON INDICADOR DE ALERTAS */}
+        {/* ENCABEZADO PRINCIPAL CON INDICADOR DE ALERTAS INTERACTIVO */}
         <Box sx={{ my: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
             <Typography variant="h3" component="h1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
@@ -92,18 +85,20 @@ function App() {
               Módulos de Alta Disponibilidad y Auditoría de Datos
             </Typography>
           </Box>
-          <Box sx={{ textAlign: 'center', bgcolor: '#0f172a', p: 2, borderRadius: 2, border: '1px solid #334155' }}>
-            <Badge badgeContent={alertsCount} color="error" max={99}>
-              <NotificationsActiveIcon sx={{ color: alertsCount > 0 ? '#ef4444' : '#22c55e', fontSize: 38 }} />
-            </Badge>
-            <Typography variant="body2" sx={{ mt: 1, fontWeight: 'bold', color: '#94a3b8' }}>
+          <Box sx={{ textAlign: 'center', bgcolor: '#0f172a', p: 1, borderRadius: 2, border: '1px solid #334155' }}>
+            <IconButton onClick={handleBellClick} title="Forzar escaneo de alertas">
+              <Badge badgeContent={alertsCount} color="error" max={99}>
+                <NotificationsActiveIcon sx={{ color: alertsCount > 0 ? '#ef4444' : '#22c55e', fontSize: 38 }} />
+              </Badge>
+            </IconButton>
+            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#94a3b8' }}>
               Alertas Activas
             </Typography>
           </Box>
         </Box>
 
         <Grid container spacing={4}>
-          {/* SECCIÓN IZQUIERDA: MANDOS DE CONTROL Y CONSOLA LOGS */}
+          {/* SECCIÓN IZQUIERDA: MANDOS DE CONTROL */}
           <Grid item xs={12} md={6}>
             <Paper elevation={6} sx={{ p: 4, borderRadius: 3, height: '100%' }}>
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
@@ -133,7 +128,7 @@ function App() {
                 </Grid>
               </Grid>
 
-              {/* CONSOLA DE REGISTROS DE ACCIÓN */}
+              {/* CONSOLA DE REGISTROS */}
               <Box sx={{ mt: 5, p: 3, bgcolor: '#000000', borderRadius: 2, border: '1px solid #334155', minHeight: '120px' }}>
                 <Typography variant="body2" sx={{ color: '#22c55e', fontFamily: 'monospace', fontSize: '15px' }}>
                   C:\DataOps\Logs&gt; {statusMessage}
@@ -142,7 +137,7 @@ function App() {
             </Paper>
           </Grid>
 
-          {/* SECCIÓN DERECHA: AUDITORÍA DE REGISTROS HISTÓRICOS Y TABLA */}
+          {/* SECCIÓN DERECHA: AUDITORÍA DE TABLAS */}
           <Grid item xs={12} md={6}>
             <Paper elevation={6} sx={{ p: 4, borderRadius: 3, height: '100%', bgcolor: '#1e293b' }}>
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
@@ -151,20 +146,19 @@ function App() {
 
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={12} sm={6}>
-                  {/* NOTA: Ajusta '/api/connections/logs' por tu ruta para leer logs de conexión */}
-                  <Button fullWidth variant="outlined" color="primary" onClick={() => loadLogsToTable('/api/connections/logs', 'Historial Health Check')}>
-                    Ver Historial Salud
+                  {/* Este botón usa la única ruta GET disponible en tu Swagger para demostrar la tabla */}
+                  <Button fullWidth variant="outlined" color="primary" onClick={() => loadLogsToTable('/api/cache/transactions/1', 'Transacciones en Caché')}>
+                    Ver Logs de Caché
                   </Button>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  {/* NOTA: Ajusta '/api/queries/slow-logs' por tu ruta para leer consultas lentas */}
                   <Button fullWidth variant="outlined" color="error" onClick={() => loadLogsToTable('/api/queries/slow-logs', 'Consultas Lentas')}>
                     Ver Queries Lentas
                   </Button>
                 </Grid>
               </Grid>
 
-              {/* VISUALIZADOR DE TABLAS INTELEGENTE */}
+              {/* VISUALIZADOR DE TABLAS INTELIGENTE */}
               <TableContainer sx={{ maxHeight: 280, bgcolor: '#0f172a', borderRadius: 2, border: '1px solid #334155' }}>
                 <Table stickyHeader size="small">
                   <TableHead>
