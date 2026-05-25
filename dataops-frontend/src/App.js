@@ -46,7 +46,6 @@ function App() {
         ? await axios.post(`http://localhost:8000${endpoint}`)
         : await axios.get(`http://localhost:8000${endpoint}`);
 
-      // Modificamos ligeramente para extraer detalles si el backend los envía (como el Hash MD5 o RTO/RPO)
       let successMsg = response.data.message || "Operación procesada con éxito.";
       if (response.data.details) {
          successMsg += ` | Detalles: ${JSON.stringify(response.data.details)}`;
@@ -134,7 +133,6 @@ function App() {
           <Grid item xs={12} md={6}>
             <Paper elevation={6} sx={{ p: 4, borderRadius: 3, height: '100%' }}>
 
-              {/* Título alineado con el botón de Añadir Motor */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
                   Orquestación de Infraestructura
@@ -161,7 +159,6 @@ function App() {
                   </Button>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  {/* El botón de backup ya apunta a nuestra nueva ruta dinámica */}
                   <Button fullWidth variant="contained" color="success" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/api/backups/full/1', 'POST', 'Backups Azure')}>
                     4. Forzar Backup
                   </Button>
@@ -171,7 +168,6 @@ function App() {
                     5. Forzar Deadlock (Choque Transaccional)
                   </Button>
                 </Grid>
-                {/* NUEVOS BOTONES FASE C: DISASTER RECOVERY */}
                 <Grid item xs={12} sm={6}>
                   <Button fullWidth variant="contained" sx={{ bgcolor: '#9f1239', '&:hover': { bgcolor: '#be123c' }, fontWeight: 'bold' }} size="large" onClick={() => executeCommand('/api/disaster/drop-table', 'POST', 'Simular Desastre')}>
                     6. DROP TABLE (Desastre)
@@ -180,6 +176,12 @@ function App() {
                 <Grid item xs={12} sm={6}>
                   <Button fullWidth variant="contained" sx={{ bgcolor: '#0284c7', '&:hover': { bgcolor: '#0369a1' }, fontWeight: 'bold' }} size="large" onClick={() => executeCommand('/api/disaster/restore', 'POST', 'Protocolo Recovery')}>
                     7. Restaurar (RTO/RPO)
+                  </Button>
+                </Grid>
+                {/* NUEVO BOTÓN FASE D: DEMO CACHÉ REDIS */}
+                <Grid item xs={12}>
+                  <Button fullWidth variant="contained" sx={{ bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' }, fontWeight: 'bold' }} size="large" onClick={() => executeCommand('/api/cache/demo', 'POST', 'Rendimiento Caché')}>
+                    8. Demo Caché (Redis vs Relacional)
                   </Button>
                 </Grid>
               </Grid>
