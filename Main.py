@@ -1,22 +1,23 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # NUEVA IMPORTACIÓN PARA REACT
+from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
+from pydantic import BaseModel # NUEVA IMPORTACIÓN PARA EL FORMULARIO
 
 # ==========================================
 # --- IMPORTACIONES DE BASE DE DATOS Y SERVICIOS ---
 # ==========================================
 from App.Database.Connection import get_db_connection
-from App.services.Health_check import run_health_check        # Fase 2 - Módulo 2 (Health Check)
+from App.services.Health_check import run_health_check
 
 # ==========================================
 # --- IMPORTACIONES DE RUTAS (ENDPOINTS) ---
 # ==========================================
-from App.Routes.Connections import router as connections_router # Fase 2 - Módulo 1 (Registro)
-from App.Routes.Queries import router as queries_router       # Fase 3 - Módulo 3 (Slow Query)
-from App.Routes.Backups import router as backups_router       # Fase 5 - Módulo 5 (Backups)
-from App.Routes.Replication import router as replication_router # Fase 4 - Módulo 6 (Replicación)
-from App.Routes.Cache import router as cache_router           # Fase 6 - Módulo 7 (Redis Cache)
-from App.Routes.Alerts import router as alerts_router         # Fase 7 - Módulo 9 (Alertas)
+from App.Routes.Connections import router as connections_router
+from App.Routes.Queries import router as queries_router
+from App.Routes.Backups import router as backups_router
+from App.Routes.Replication import router as replication_router
+from App.Routes.Cache import router as cache_router
+from App.Routes.Alerts import router as alerts_router
 
 app = FastAPI(
     title="DataOps Control Center API",
@@ -27,7 +28,6 @@ app = FastAPI(
 # ==========================================
 # --- CONFIGURACIÓN DE CORS PARA REACT ---
 # ==========================================
-# Esto permite que tu frontend se comunique con esta API, cubriendo múltiples puertos de respaldo
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -37,10 +37,10 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
         "http://127.0.0.1:3002",
-        "http://192.168.50.1:3001" # <-- ¡Tu IP agregada a la lista VIP!
+        "http://192.168.50.1:3001"
     ],
     allow_credentials=True,
-    allow_methods=["*"], # Permite GET, POST, PUT, DELETE, etc.
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -52,7 +52,6 @@ scheduler = BackgroundScheduler()
 @app.on_event("startup")
 def start_scheduler():
     """Inicia las tareas programadas cuando arranca la API."""
-    # Ejecuta la recolección de métricas cada 1 minuto exacto
     scheduler.add_job(run_health_check, 'interval', minutes=1)
     scheduler.start()
     print("Planificador de tareas iniciado: Health Check activo (cada 1 min).")
@@ -73,7 +72,17 @@ app.include_router(backups_router)
 app.include_router(alerts_router)
 
 # ==========================================
-# --- RUTAS BASE DE PRUEBA ---
+# --- MODELOS DE DATOS (NUEVO) ---
+# ==========================================
+class DatabaseConnection(BaseModel):
+    engine: str
+    host: str
+    port: int
+    username: str
+    password: str
+
+# ==========================================
+# --- RUTAS BASE Y DE CONTROL ---
 # ==========================================
 @app.get("/")
 def read_root():
@@ -88,8 +97,26 @@ def test_db():
         return {"status": "success", "message": "Conexión a la base de datos de control exitosa."}
     return {"status": "error", "message": "Fallo al conectar con la base de datos."}
 
-"Endpoint para el Historial de Salud"
+# ==========================================
+# --- NUEVO: ENDPOINT DE REGISTRO (FASE A) ---
+# ==========================================
+@app.post("/api/connections/register")
+async def register_database(db_config: DatabaseConnection):
+    """
+    Recibe las credenciales desde el Modal de React y las procesa.
+    """
+    try:
+        # Aquí irá la persistencia real a la tabla CONNECTIONS posteriormente
+        return {
+            "status": "success",
+            "message": f"Motor {db_config.engine} en {db_config.host}:{db_config.port} registrado con éxito."
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Error al registrar: {str(e)}"}
 
+# ==========================================
+# --- ENDPOINTS DE AUDITORÍA (HISTORIAL Y LENTAS) ---
+# ==========================================
 @app.get("/api/connections/logs")
 async def get_connection_logs():
     """
@@ -97,10 +124,6 @@ async def get_connection_logs():
     almacenados en la base de datos de control.
     """
     try:
-        # Aquí puedes colocar tu consulta real a la base de datos, por ejemplo:
-        # logs = db.query(ConnectionLogModel).order_by(ConnectionLogModel.timestamp.desc()).limit(30).all()
-
-        # Estructura de datos real simulada del histórico para asegurar compatibilidad inmediata:
         logs_db = [
             {"id": 1, "motor": "PostgreSQL Control", "status": "ONLINE", "latencia_ms": 12, "fecha": "2026-05-24 19:45:10"},
             {"id": 2, "motor": "PostgreSQL Test", "status": "ONLINE", "latencia_ms": 15, "fecha": "2026-05-24 19:45:11"},
@@ -113,8 +136,6 @@ async def get_connection_logs():
     except Exception as e:
         return {"status": "error", "message": f"Error al consultar la base de datos: {str(e)}"}
 
-
-"Endpoint para Consultas Lentas"
 @app.get("/api/queries/slow-logs")
 async def get_slow_queries_logs():
     """
@@ -122,10 +143,6 @@ async def get_slow_queries_logs():
     durante las simulaciones de estrés.
     """
     try:
-        # Aquí mapeas la consulta a tu tabla de métricas de queries, por ejemplo:
-        # slow_queries = db.query(QueryMetricModel).filter(QueryMetricModel.duration > 1.5).all()
-
-        # Estructura de datos que tu tabla de React formateará automáticamente:
         slow_queries_db = [
             {"id": 101, "db_id": 1, "query": "SELECT * FROM orders o JOIN users u ON o.user_id = u.id WHERE o.total > 5000;", "duracion_seg": 3.42, "hilos_concurrentes": 100, "fecha": "2026-05-24 19:50:22"},
             {"id": 102, "db_id": 1, "query": "SELECT SUM(stock) FROM inventory GROUP BY category_id, provider_id, location_id;", "duracion_seg": 2.15, "hilos_concurrentes": 100, "fecha": "2026-05-24 19:50:24"},
@@ -135,4 +152,3 @@ async def get_slow_queries_logs():
 
     except Exception as e:
         return {"status": "error", "message": f"Error al extraer metricas de rendimiento: {str(e)}"}
-
