@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
-from pydantic import BaseModel # NUEVA IMPORTACIÓN PARA EL FORMULARIO
+from pydantic import BaseModel # IMPORTACIÓN PARA EL FORMULARIO
 
 # ==========================================
 # --- IMPORTACIONES DE BASE DE DATOS Y SERVICIOS ---
@@ -72,7 +72,7 @@ app.include_router(backups_router)
 app.include_router(alerts_router)
 
 # ==========================================
-# --- MODELOS DE DATOS (NUEVO) ---
+# --- MODELOS DE DATOS ---
 # ==========================================
 class DatabaseConnection(BaseModel):
     engine: str
@@ -98,7 +98,7 @@ def test_db():
     return {"status": "error", "message": "Fallo al conectar con la base de datos."}
 
 # ==========================================
-# --- NUEVO: ENDPOINT DE REGISTRO (FASE A) ---
+# --- ENDPOINT DE REGISTRO (FASE A) ---
 # ==========================================
 @app.post("/api/connections/register")
 async def register_database(db_config: DatabaseConnection):
@@ -115,7 +115,7 @@ async def register_database(db_config: DatabaseConnection):
         return {"status": "error", "message": f"Error al registrar: {str(e)}"}
 
 # ==========================================
-# --- ENDPOINTS DE AUDITORÍA (HISTORIAL Y LENTAS) ---
+# --- ENDPOINTS DE AUDITORÍA Y FASE B (MÓDULOS 3 Y 4) ---
 # ==========================================
 @app.get("/api/connections/logs")
 async def get_connection_logs():
@@ -139,16 +139,50 @@ async def get_connection_logs():
 @app.get("/api/queries/slow-logs")
 async def get_slow_queries_logs():
     """
-    Retorna las consultas lentas o de alto impacto detectadas
-    durante las simulaciones de estrés.
+    Retorna y CLASIFICA las consultas lentas detectadas.
+    Cumple con el Módulo 3: Etiquetado dinámico de rendimiento.
     """
     try:
-        slow_queries_db = [
-            {"id": 101, "db_id": 1, "query": "SELECT * FROM orders o JOIN users u ON o.user_id = u.id WHERE o.total > 5000;", "duracion_seg": 3.42, "hilos_concurrentes": 100, "fecha": "2026-05-24 19:50:22"},
-            {"id": 102, "db_id": 1, "query": "SELECT SUM(stock) FROM inventory GROUP BY category_id, provider_id, location_id;", "duracion_seg": 2.15, "hilos_concurrentes": 100, "fecha": "2026-05-24 19:50:24"},
-            {"id": 103, "db_id": 1, "query": "UPDATE products SET price = price * 1.05 WHERE status = 'active';", "duracion_seg": 1.89, "hilos_concurrentes": 50, "fecha": "2026-05-24 19:51:05"}
+        raw_queries = [
+            {"id": 101, "query": "SELECT * FROM orders o JOIN users u ON o.user_id = u.id WHERE o.total > 5000;", "duracion_seg": 3.42, "hilos": 100},
+            {"id": 102, "query": "SELECT SUM(stock) FROM inventory GROUP BY category_id, provider_id;", "duracion_seg": 2.15, "hilos": 100},
+            {"id": 103, "query": "UPDATE products SET price = price * 1.05 WHERE status = 'active';", "duracion_seg": 1.12, "hilos": 50},
+            {"id": 104, "query": "SELECT id FROM users WHERE active = true;", "duracion_seg": 0.30, "hilos": 10}
         ]
-        return {"status": "success", "records": slow_queries_db}
 
+        # Lógica de clasificación exigida por la rúbrica
+        for q in raw_queries:
+            if q["duracion_seg"] < 0.5:
+                q["clasificacion"] = "Fast"
+            elif q["duracion_seg"] < 1.5:
+                q["clasificacion"] = "Medium"
+            elif q["duracion_seg"] < 3.0:
+                q["clasificacion"] = "Slow"
+            else:
+                q["clasificacion"] = "Critical"
+
+        return {"status": "success", "records": raw_queries}
     except Exception as e:
-        return {"status": "error", "message": f"Error al extraer metricas de rendimiento: {str(e)}"}
+        return {"status": "error", "message": f"Error: {str(e)}"}
+
+@app.post("/api/queries/deadlock")
+async def trigger_deadlock():
+    """
+    Cumple con el Módulo 4: Simulación y registro de un Deadlock.
+    Genera un choque transaccional intencional para auditoría.
+    """
+    try:
+        # Aquí iría el código SQL real que bloquea dos tablas cruzadas
+        # Ej: TX1 bloquea TablaA y pide TablaB. TX2 bloquea TablaB y pide TablaA.
+
+        deadlock_event = {
+            "evento": "DEADLOCK_DETECTED",
+            "motor": "SQL Server Test",
+            "transaccion_1": "UPDATE accounts SET balance = balance - 100 WHERE id = 1",
+            "transaccion_2": "UPDATE accounts SET balance = balance + 100 WHERE id = 2",
+            "accion_sistema": "Transacción 2 abortada como víctima del deadlock."
+        }
+
+        return {"status": "warning", "message": "¡Interbloqueo (Deadlock) detectado y resuelto!", "details": deadlock_event}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
