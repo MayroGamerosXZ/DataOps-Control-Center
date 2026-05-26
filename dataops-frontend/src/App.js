@@ -8,7 +8,7 @@ import {
 } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import InfoIcon from '@mui/icons-material/Info'; // <-- IMPORTACIÓN CORREGIDA
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import axios from 'axios';
 
@@ -92,10 +92,10 @@ function App() {
   const handleLogin = (e) => {
     e.preventDefault();
     // Validando credenciales para acceso (Login Simulado)
-    if (loginForm.username === 'Mayro' && loginForm.password === 'umg123') {
+    if (loginForm.username === 'Mayro' && loginForm.password === 'Robin302019') {
       setIsAuthenticated(true);
     } else {
-      alert("Credenciales incorrectas. (Pista: Mayro / umg123)");
+      alert("Credenciales incorrectas. (Pista: Mayro / Robin302019)");
     }
   };
 
@@ -344,10 +344,10 @@ function App() {
             </Grid>
           </Grid>
 
-          {/* BOTÓN FLOTANTE DE INFORMACIÓN (FAB) */}
+          {/* BOTÓN FLOTANTE DE INFORMACIÓN (FAB) CON ICONO CORREGIDO */}
           <Tooltip title="Explicación del Flujo de Arquitectura" arrow placement="left" TransitionComponent={Zoom}>
             <Fab color="primary" sx={{ position: 'fixed', bottom: 30, right: 30, boxShadow: '0 0 20px rgba(0, 242, 254, 0.6)' }} onClick={() => setOpenHelp(true)}>
-              <HelpOutlineIcon />
+              <InfoIcon />
             </Fab>
           </Tooltip>
 
