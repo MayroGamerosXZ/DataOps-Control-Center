@@ -3,10 +3,13 @@ import {
   Container, Typography, Box, Button, Paper, Grid,
   ThemeProvider, createTheme, CssBaseline,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Badge, IconButton,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Fade
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Fade,
+  Tooltip, Zoom, Fab, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import axios from 'axios';
 
 // ==========================================
@@ -50,14 +53,27 @@ const futuristicTheme = createTheme({
           }
         }
       }
+    },
+    // Estilos personalizados para los Globos Flotantes (Tooltips)
+    MuiTooltip: {
+      styleOverrides: {
+        tooltip: {
+          backgroundColor: 'rgba(10, 15, 28, 0.95)',
+          border: '1px solid #00f2fe',
+          boxShadow: '0px 0px 20px rgba(0, 242, 254, 0.4)',
+          fontSize: '14px',
+          borderRadius: '10px',
+          padding: '12px 16px',
+          fontWeight: 'bold',
+          color: '#e2e8f0'
+        },
+        arrow: { color: '#00f2fe' }
+      }
     }
   }
 });
 
 function App() {
-  // ==========================================
-  // ESTADOS DEL SISTEMA
-  // ==========================================
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
 
@@ -67,26 +83,22 @@ function App() {
   const [tableTitle, setTableTitle] = useState("");
 
   const [openModal, setOpenModal] = useState(false);
+  const [openHelp, setOpenHelp] = useState(false); // Estado para el panel de arquitectura flotante
+
   const [formData, setFormData] = useState({
     engine: 'PostgreSQL', host: '', port: '', username: '', password: ''
   });
 
-  // ==========================================
-  // LÓGICA DE LOGIN SIMULADO
-  // ==========================================
   const handleLogin = (e) => {
     e.preventDefault();
-    // Credenciales de prueba para la presentación (puedes cambiarlas)
-    if (loginForm.username === 'Mayro' && loginForm.password === 'Robin302019') {
+    // Validando credenciales para acceso (Login Simulado)
+    if (loginForm.username === 'Mayro' && loginForm.password === 'umg123') {
       setIsAuthenticated(true);
     } else {
-      alert("Credenciales incorrectas. (Pista: admin / Robin)");
+      alert("Credenciales incorrectas. (Pista: Mayro / umg123)");
     }
   };
 
-  // ==========================================
-  // LÓGICA DE COMUNICACIÓN CON BACKEND (FastAPI)
-  // ==========================================
   const executeCommand = async (endpoint, method = 'GET', moduleName) => {
     setStatusMessage(`[${moduleName}] Iniciando proceso...`);
     try {
@@ -131,9 +143,6 @@ function App() {
     }
   };
 
-  // ==========================================
-  // PANTALLA DE LOGIN
-  // ==========================================
   if (!isAuthenticated) {
     return (
       <ThemeProvider theme={futuristicTheme}>
@@ -171,13 +180,10 @@ function App() {
     );
   }
 
-  // ==========================================
-  // PANTALLA PRINCIPAL (DASHBOARD FUTURISTA)
-  // ==========================================
   return (
     <ThemeProvider theme={futuristicTheme}>
       <CssBaseline />
-      <Box sx={{ minHeight: '100vh', background: 'radial-gradient(circle at 50% 0%, #1a2a42 0%, #0a0f1c 70%)', pt: 4, pb: 8 }}>
+      <Box sx={{ minHeight: '100vh', background: 'radial-gradient(circle at 50% 0%, #1a2a42 0%, #0a0f1c 70%)', pt: 4, pb: 8, position: 'relative' }}>
         <Container maxWidth="xl">
 
           {/* ENCABEZADO */}
@@ -204,62 +210,80 @@ function App() {
           </Box>
 
           <Grid container spacing={4}>
-            {/* SECCIÓN IZQUIERDA: MANDOS */}
+            {/* SECCIÓN IZQUIERDA: MANDOS CON TOOLTIPS */}
             <Grid item xs={12} lg={7}>
               <Paper sx={{ p: 4, height: '100%' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                   <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Panel de Orquestación</Typography>
-                  <Button variant="contained" onClick={() => setOpenModal(true)} sx={{ borderRadius: '50px', px: 3 }}>
-                    + Nuevo Motor
-                  </Button>
+                  <Tooltip title="Agrega credenciales seguras de bases de datos para integrarlas al pool de monitoreo." arrow TransitionComponent={Zoom}>
+                    <Button variant="contained" onClick={() => setOpenModal(true)} sx={{ borderRadius: '50px', px: 3 }}>
+                      + Nuevo Motor
+                    </Button>
+                  </Tooltip>
                 </Box>
 
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={4}>
-                    <Button fullWidth variant="contained" color="secondary" size="large" onClick={() => executeCommand('/test-db', 'GET', 'Health Check')} sx={{ height: '60px' }}>
-                      1. Health Check
-                    </Button>
+                    <Tooltip title="Realiza un ping a los motores para medir latencia y estado (Módulo 2)." arrow TransitionComponent={Zoom} placement="top">
+                      <Button fullWidth variant="contained" color="secondary" size="large" onClick={() => executeCommand('/test-db', 'GET', 'Health Check')} sx={{ height: '60px' }}>
+                        1. Health Check
+                      </Button>
+                    </Tooltip>
                   </Grid>
                   <Grid item xs={12} sm={4}>
-                    <Button fullWidth variant="contained" color="warning" size="large" onClick={() => executeCommand('/api/queries/stress-test/1', 'POST', 'Prueba de Estrés')} sx={{ height: '60px' }}>
-                      2. Stress Test
-                    </Button>
+                    <Tooltip title="Genera 100 hilos concurrentes simulando carga pesada de usuarios (Módulos 3 y 4)." arrow TransitionComponent={Zoom} placement="top">
+                      <Button fullWidth variant="contained" color="warning" size="large" onClick={() => executeCommand('/api/queries/stress-test/1', 'POST', 'Prueba de Estrés')} sx={{ height: '60px' }}>
+                        2. Stress Test
+                      </Button>
+                    </Tooltip>
                   </Grid>
                   <Grid item xs={12} sm={4}>
-                    <Button fullWidth variant="contained" color="primary" size="large" onClick={() => executeCommand('/api/replication/sync/1', 'POST', 'Replicación')} sx={{ height: '60px' }}>
-                      3. Sync Réplica
-                    </Button>
+                    <Tooltip title="Simula y evalúa el 'Lag' en replicación distribuida (Normal, Media, Crítica) (Módulo 6)." arrow TransitionComponent={Zoom} placement="top">
+                      <Button fullWidth variant="contained" color="primary" size="large" onClick={() => executeCommand('/api/replication/sync/1', 'POST', 'Replicación')} sx={{ height: '60px' }}>
+                        3. Sync Réplica
+                      </Button>
+                    </Tooltip>
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <Button fullWidth variant="contained" color="success" size="large" onClick={() => executeCommand('/api/backups/full/1', 'POST', 'Backups Azure')} sx={{ height: '60px' }}>
-                      4. Backup a Nube
-                    </Button>
+                    <Tooltip title="Crea respaldos, genera Hash MD5 y los envía a Azure Blob Storage (Módulo 5)." arrow TransitionComponent={Zoom} placement="bottom">
+                      <Button fullWidth variant="contained" color="success" size="large" onClick={() => executeCommand('/api/backups/full/1', 'POST', 'Backups Azure')} sx={{ height: '60px' }}>
+                        4. Backup a Nube
+                      </Button>
+                    </Tooltip>
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <Button fullWidth variant="contained" sx={{ bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' }, height: '60px' }} onClick={() => executeCommand('/api/cache/demo', 'POST', 'Rendimiento Caché')}>
-                      8. Demo Redis Caché
-                    </Button>
+                    <Tooltip title="Compara velocidad real: Consulta SQL directa vs Consulta servida en memoria por Redis (Módulo 7)." arrow TransitionComponent={Zoom} placement="bottom">
+                      <Button fullWidth variant="contained" sx={{ bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' }, height: '60px' }} onClick={() => executeCommand('/api/cache/demo', 'POST', 'Rendimiento Caché')}>
+                        8. Demo Redis Caché
+                      </Button>
+                    </Tooltip>
                   </Grid>
 
                   <Grid item xs={12} sx={{ mt: 2 }}>
                     <Typography variant="subtitle2" sx={{ color: 'error.main', mb: 1, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px' }}>
-                      Zona de Desastres (Cuidado)
+                      Zona de Desastres (Pruebas Controladas)
                     </Typography>
                   </Grid>
                   <Grid item xs={12} sm={4}>
-                    <Button fullWidth variant="outlined" color="error" onClick={() => executeCommand('/api/queries/deadlock', 'POST', 'Forzar Deadlock')}>
-                      5. Deadlock
-                    </Button>
+                    <Tooltip title="Fuerza un choque transaccional de escritura mutua para probar la detección del motor (Módulo 4)." arrow TransitionComponent={Zoom}>
+                      <Button fullWidth variant="outlined" color="error" onClick={() => executeCommand('/api/queries/deadlock', 'POST', 'Forzar Deadlock')}>
+                        5. Deadlock
+                      </Button>
+                    </Tooltip>
                   </Grid>
                   <Grid item xs={12} sm={4}>
-                    <Button fullWidth variant="contained" color="error" onClick={() => executeCommand('/api/disaster/drop-table', 'POST', 'Simular Desastre')}>
-                      6. DROP TABLE
-                    </Button>
+                    <Tooltip title="Borra intencionalmente una tabla para simular pérdida total de datos operativos." arrow TransitionComponent={Zoom}>
+                      <Button fullWidth variant="contained" color="error" onClick={() => executeCommand('/api/disaster/drop-table', 'POST', 'Simular Desastre')}>
+                        6. DROP TABLE
+                      </Button>
+                    </Tooltip>
                   </Grid>
                   <Grid item xs={12} sm={4}>
-                    <Button fullWidth variant="contained" color="info" onClick={() => executeCommand('/api/disaster/restore', 'POST', 'Protocolo Recovery')}>
-                      7. Recovery RTO/RPO
-                    </Button>
+                    <Tooltip title="Inicia la restauración point-in-time y calcula la pérdida de datos (RPO) y tiempo caído (RTO)." arrow TransitionComponent={Zoom}>
+                      <Button fullWidth variant="contained" color="info" onClick={() => executeCommand('/api/disaster/restore', 'POST', 'Protocolo Recovery')}>
+                        7. Recovery RTO/RPO
+                      </Button>
+                    </Tooltip>
                   </Grid>
                 </Grid>
 
@@ -320,7 +344,14 @@ function App() {
             </Grid>
           </Grid>
 
-          {/* MODAL */}
+          {/* BOTÓN FLOTANTE DE INFORMACIÓN (FAB) */}
+          <Tooltip title="Explicación del Flujo de Arquitectura" arrow placement="left" TransitionComponent={Zoom}>
+            <Fab color="primary" sx={{ position: 'fixed', bottom: 30, right: 30, boxShadow: '0 0 20px rgba(0, 242, 254, 0.6)' }} onClick={() => setOpenHelp(true)}>
+              <HelpOutlineIcon />
+            </Fab>
+          </Tooltip>
+
+          {/* MODAL DE REGISTRO */}
           <Dialog open={openModal} onClose={() => setOpenModal(false)} PaperProps={{ sx: { bgcolor: '#1a2a42', backgroundImage: 'none' } }}>
             <DialogTitle sx={{ color: 'primary.main', fontWeight: 'bold' }}>Conectar Motor DB</DialogTitle>
             <DialogContent>
@@ -337,6 +368,55 @@ function App() {
             <DialogActions sx={{ p: 3 }}>
               <Button onClick={() => setOpenModal(false)} color="inherit">Cancelar</Button>
               <Button onClick={handleRegisterSubmit} variant="contained">Guardar</Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* MODAL / PANEL DE ARQUITECTURA (CUADRO DESPLEGABLE) */}
+          <Dialog open={openHelp} onClose={() => setOpenHelp(false)} fullWidth maxWidth="md" PaperProps={{ sx: { bgcolor: '#0f172a', border: '1px solid #4facfe' } }}>
+            <DialogTitle sx={{ color: '#00f2fe', fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              ¿Cómo están relacionados los Módulos del Sistema?
+            </DialogTitle>
+            <DialogContent sx={{ mt: 2 }}>
+              <Typography variant="body1" sx={{ color: '#cbd5e1', mb: 3 }}>
+                Esta plataforma es un flujo orquestado. Ningún botón funciona aislado; representan el ciclo de vida de los datos empresariales:
+              </Typography>
+
+              <Accordion sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white', mb: 1 }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main' }} />}>
+                  <Typography fontWeight="bold">1. La Base Operativa (Botones 1, 2 y 3)</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography variant="body2" color="text.secondary">
+                    Todo empieza asegurando que los motores están vivos (<strong>Health Check</strong>). Una vez activos, se inyectan transacciones masivas (<strong>Stress Test</strong>) para obligar al sistema a encolar procesos. Ese alto volumen de datos viaja hacia nodos de respaldo mediante la <strong>Sincronización de Réplica</strong>.
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
+
+              <Accordion sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white', mb: 1 }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main' }} />}>
+                  <Typography fontWeight="bold">2. Velocidad y Colisiones (Botones 5 y 8)</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography variant="body2" color="text.secondary">
+                    Bajo esa carga extrema, las consultas compiten. Si chocan de frente, causan un <strong>Deadlock</strong>, el cual el backend atrapa y reporta. Para aliviar esa carga en la base de datos principal, entra <strong>Redis Caché</strong>, absorbiendo las lecturas repetitivas y devolviendo los datos en milisegundos.
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
+
+              <Accordion sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white', mb: 1 }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: 'primary.main' }} />}>
+                  <Typography fontWeight="bold">3. Catástrofe y Rescate (Botones 4, 6 y 7)</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography variant="body2" color="text.secondary">
+                    Constantemente enviamos snapshots cifrados a la nube (<strong>Backup Azure</strong>). Esto nos permite sobrevivir a un error fatal como un <strong>DROP TABLE</strong>. Inmediatamente ejecutamos el protocolo de <strong>Restauración</strong> para recuperar los datos perdidos evaluando nuestro margen de RTO y RPO.
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
+
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+              <Button onClick={() => setOpenHelp(false)} variant="outlined">Entendido</Button>
             </DialogActions>
           </Dialog>
 
