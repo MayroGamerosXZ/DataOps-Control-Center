@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 from pydantic import BaseModel
 
-# Cargar variables de entorno
+# Cargar variables de entorno desde el archivo .env
 load_dotenv()
 
 # ==========================================
@@ -66,16 +66,16 @@ class DatabaseConnection(BaseModel):
     password: str
 
 # ==========================================
-# --- FUNCIÓN REAL DE ENVÍO DE CORREO SMTP ---
+# --- FUNCIÓN REAL DE ENVÍO DE CORREO SMTP (GMAIL) ---
 # ==========================================
 def enviar_correo_alerta(asunto: str, mensaje_cuerpo: str, destinatario: str = "dba@distribuidoralopez.com"):
+    print(f"--- [DEBUG SMTP] Iniciando envío a {destinatario} ---")
     try:
-        # Obtener credenciales desde el archivo .env
         sender_email = os.getenv("GMAIL_USER")
         password = os.getenv("GMAIL_PASS")
 
         if not sender_email or not password:
-            print("[ERROR] Credenciales SMTP no configuradas en .env")
+            print("[ERROR CRÍTICO] Credenciales GMAIL_USER o GMAIL_PASS no configuradas en .env")
             return
 
         msg = MIMEText(mensaje_cuerpo)
@@ -88,9 +88,10 @@ def enviar_correo_alerta(asunto: str, mensaje_cuerpo: str, destinatario: str = "
             server.login(sender_email, password)
             server.send_message(msg)
 
-        print(f"\n[ÉXITO SMTP] -> Correo enviado a {destinatario} desde {sender_email}\n")
+        print(f"--- [ÉXITO SMTP] Correo enviado a {destinatario} desde {sender_email} ---")
     except Exception as e:
-        print(f"Error al enviar correo vía SMTP: {e}")
+        print(f"--- [ERROR SMTP] ---")
+        print(f"Detalle: {str(e)}")
 
 @app.get("/")
 def read_root():
@@ -110,31 +111,19 @@ async def register_database(db_config: DatabaseConnection):
 
 @app.get("/api/connections/logs")
 async def get_connection_logs():
-    logs_db = [
-        {"id": 1, "motor": "PostgreSQL Control", "status": "ONLINE", "latencia_ms": 12},
-        {"id": 2, "motor": "PostgreSQL Test", "status": "ONLINE", "latencia_ms": 15},
-        {"id": 3, "motor": "SQL Server Test", "status": "ONLINE", "latencia_ms": 28}
-    ]
-    return {"status": "success", "records": logs_db}
+    return {"status": "success", "records": [{"id": 1, "motor": "PostgreSQL", "status": "ONLINE"}]}
 
 @app.get("/api/queries/slow-logs")
 async def get_slow_queries_logs():
     raw_queries = [
-        {"query": "SELECT * FROM orders o JOIN users u ON o.user_id = u.id WHERE o.total > 5000;", "duracion_seg": 3.42, "plan_ejecucion": "Full Table Scan", "optimizacion_sugerida": "CREATE INDEX idx_orders_total ON orders(total);"},
-        {"query": "SELECT SUM(stock) FROM inventory GROUP BY category_id;", "duracion_seg": 2.15, "plan_ejecucion": "Sequential Scan", "optimizacion_sugerida": "CREATE NONCLUSTERED INDEX idx_inv_category ON inventory(category_id) INCLUDE (stock);"},
-        {"query": "SELECT id FROM users WHERE active = true;", "duracion_seg": 0.30, "plan_ejecucion": "Index Seek", "optimizacion_sugerida": "Ninguna."}
+        {"query": "SELECT * FROM orders;", "duracion_seg": 3.42, "plan_ejecucion": "Full Scan", "optimizacion_sugerida": "CREATE INDEX idx_orders;"}
     ]
-    for q in raw_queries:
-        if q["duracion_seg"] < 0.5: q["clasificacion"] = "Fast"
-        elif q["duracion_seg"] < 1.5: q["clasificacion"] = "Medium"
-        elif q["duracion_seg"] < 3.0: q["clasificacion"] = "Slow"
-        else: q["clasificacion"] = "Critical"
     return {"status": "success", "records": raw_queries}
 
 @app.post("/api/queries/deadlock")
 async def trigger_deadlock(background_tasks: BackgroundTasks):
-    background_tasks.add_task(enviar_correo_alerta, "Deadlock Crítico", "Se ha detectado un bloqueo mutuo en el motor SQL Server.")
-    return {"status": "warning", "message": "¡Interbloqueo detectado! Correo enviado al DBA."}
+    background_tasks.add_task(enviar_correo_alerta, "Deadlock Crítico", "Se ha detectado un bloqueo mutuo.")
+    return {"status": "warning", "message": "Interbloqueo detectado. Correo en proceso."}
 
 @app.post("/api/backups/{backup_type}/{db_id}")
 async def execute_cloud_backup(backup_type: str, db_id: int):
@@ -142,25 +131,16 @@ async def execute_cloud_backup(backup_type: str, db_id: int):
 
 @app.post("/api/disaster/drop-table")
 async def simulate_drop_table(background_tasks: BackgroundTasks):
-    background_tasks.add_task(enviar_correo_alerta, "¡DESASTRE! DROP TABLE", "La tabla operativa 'users' ha sido eliminada.")
+    background_tasks.add_task(enviar_correo_alerta, "¡DESASTRE!", "La tabla 'users' fue eliminada.")
     return {"status": "critical", "message": "¡ALERTA CRÍTICA! DROP TABLE detectado."}
 
 @app.post("/api/disaster/restore")
 async def execute_recovery_protocol():
-    return {"status": "success", "message": "Protocolo Recovery finalizado.", "details": {"rpo": "12m", "rto": "45s"}}
+    return {"status": "success", "message": "Protocolo Recovery finalizado."}
 
-replication_scenario = 0
 @app.post("/api/replication/sync/{db_id}")
 async def sync_replication(db_id: int):
-    global replication_scenario
-    scenarios = [
-        {"estado": "Normal", "lag": 2, "alerta": False, "cap": "Consistencia Fuerte"},
-        {"estado": "Media", "lag": 5, "alerta": False, "cap": "Consistencia Eventual"},
-        {"estado": "Crítica", "lag": 20, "alerta": True, "cap": "Disponibilidad sobre Consistencia"}
-    ]
-    current = scenarios[replication_scenario]
-    replication_scenario = (replication_scenario + 1) % 3
-    return {"status": "warning" if current['alerta'] else "success", "details": current}
+    return {"status": "success", "details": {"estado": "Normal", "cap": "Consistencia Fuerte"}}
 
 @app.post("/api/cache/demo")
 async def cache_performance_demo():
@@ -168,5 +148,5 @@ async def cache_performance_demo():
 
 @app.post("/api/alerts/scan/{db_id}")
 async def scan_and_alert(db_id: int, background_tasks: BackgroundTasks):
-    background_tasks.add_task(enviar_correo_alerta, "Reporte de Escaneo", "Se detectaron anomalías en el sistema.", "2890-23-11428@miumg.edu.gt")
+    background_tasks.add_task(enviar_correo_alerta, "Reporte de Escaneo", "Se detectaron anomalías.", "2890-23-11428@miumg.edu.gt")
     return {"status": "warning", "message": "Escaneo completado. Correo enviado."}
