@@ -3,42 +3,90 @@ import {
   Container, Typography, Box, Button, Paper, Grid,
   ThemeProvider, createTheme, CssBaseline,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Badge, IconButton,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, Fade
 } from '@mui/material';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import axios from 'axios';
 
-// Tema Oscuro Profesional Integrado
-const darkTheme = createTheme({
+// ==========================================
+// TEMA FUTURISTA (Glassmorphism & Colores Vibrantes)
+// ==========================================
+const futuristicTheme = createTheme({
   palette: {
     mode: 'dark',
-    primary: { main: '#22c55e' },     // Verde esmeralda estilo consola
-    secondary: { main: '#3b82f6' },   // Azul para consultas de lectura
-    background: { default: '#0f172a', paper: '#1e293b' },
-    text: { primary: '#f8fafc', secondary: '#94a3b8' }
+    primary: { main: '#00f2fe' },     // Cian Neón
+    secondary: { main: '#4facfe' },   // Azul Neón
+    success: { main: '#43e97b' },     // Verde Brillante
+    error: { main: '#ff0844' },       // Rojo Neón
+    warning: { main: '#f83600' },     // Naranja Neón
+    info: { main: '#b12a5b' },        // Magenta
+    background: { default: '#0a0f1c', paper: 'rgba(17, 25, 40, 0.75)' },
+    text: { primary: '#ffffff', secondary: '#8ca3ba' }
   },
-  typography: {
-    fontFamily: '"Urbanist", "Roboto", "Helvetica", "Arial", sans-serif',
+  typography: { fontFamily: '"Urbanist", "Roboto", sans-serif' },
+  components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backdropFilter: 'blur(16px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '20px',
+        }
+      }
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: '14px',
+          textTransform: 'none',
+          fontWeight: 'bold',
+          letterSpacing: '0.5px',
+          transition: 'all 0.3s ease-in-out',
+          '&:hover': {
+            transform: 'translateY(-4px)',
+            boxShadow: '0 10px 20px -5px rgba(0, 242, 254, 0.4)'
+          }
+        }
+      }
+    }
   }
 });
 
 function App() {
+  // ==========================================
+  // ESTADOS DEL SISTEMA
+  // ==========================================
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+
   const [statusMessage, setStatusMessage] = useState("Sistema listo. Esperando comandos...");
   const [alertsCount, setAlertsCount] = useState(0);
   const [tableData, setTableData] = useState([]);
   const [tableTitle, setTableTitle] = useState("");
 
-  // Estados para el Modal de Registro
   const [openModal, setOpenModal] = useState(false);
   const [formData, setFormData] = useState({
     engine: 'PostgreSQL', host: '', port: '', username: '', password: ''
   });
 
-  useEffect(() => {
-    // Espacio reservado para el Polling de alertas futuras
-  }, []);
+  // ==========================================
+  // LÓGICA DE LOGIN SIMULADO
+  // ==========================================
+  const handleLogin = (e) => {
+    e.preventDefault();
+    // Credenciales de prueba para la presentación (puedes cambiarlas)
+    if (loginForm.username === 'Mayro' && loginForm.password === 'Robin302019') {
+      setIsAuthenticated(true);
+    } else {
+      alert("Credenciales incorrectas. (Pista: admin / Robin)");
+    }
+  };
 
-  // Función genérica para Botones de Acción
+  // ==========================================
+  // LÓGICA DE COMUNICACIÓN CON BACKEND (FastAPI)
+  // ==========================================
   const executeCommand = async (endpoint, method = 'GET', moduleName) => {
     setStatusMessage(`[${moduleName}] Iniciando proceso...`);
     try {
@@ -50,237 +98,250 @@ function App() {
       if (response.data.details) {
          successMsg += ` | Detalles: ${JSON.stringify(response.data.details)}`;
       }
-
       setStatusMessage(`[ÉXITO - ${moduleName}]: ${successMsg}`);
     } catch (error) {
-      setStatusMessage(`[ERROR - ${moduleName}]: Falló la ejecución. Verifica que la ruta exista en Swagger.`);
-      console.error(error);
+      setStatusMessage(`[ERROR - ${moduleName}]: Falló la ejecución. Verifica la conexión con FastAPI.`);
     }
   };
 
-  // FUNCIÓN BLINDADA: Extraer datos y forzar Array para evitar crasheos
   const loadLogsToTable = async (endpoint, title) => {
     setStatusMessage(`[Consulta] Extrayendo registros: ${title}...`);
     try {
       const response = await axios.get(`http://localhost:8000${endpoint}`);
-
       let rawData = response.data.records || response.data.data || response.data;
-      let finalRecords = [];
-
-      if (Array.isArray(rawData)) {
-        finalRecords = rawData;
-      } else if (typeof rawData === 'object' && rawData !== null) {
-        finalRecords = [rawData];
-      } else {
-        finalRecords = [{ valor: rawData }];
-      }
+      let finalRecords = Array.isArray(rawData) ? rawData : (typeof rawData === 'object' && rawData !== null ? [rawData] : [{ valor: rawData }]);
 
       setTableData(finalRecords);
       setTableTitle(title);
       setStatusMessage(`[ÉXITO]: Datos cargados correctamente (${finalRecords.length} registros).`);
     } catch (error) {
-      setStatusMessage(`[ERROR]: Ruta no encontrada. Asegúrate de haber programado este GET en FastAPI.`);
+      setStatusMessage(`[ERROR]: Ruta no encontrada o backend apagado.`);
       setTableData([]);
     }
   };
 
-  // Acción interactiva para la campana de notificaciones
-  const handleBellClick = () => {
-    executeCommand('/api/alerts/scan/1', 'POST', 'Escaneo de Alertas');
-  };
-
-  // Función para enviar el formulario de registro al backend
   const handleRegisterSubmit = async () => {
     setStatusMessage(`[Registro] Guardando nuevo motor ${formData.engine}...`);
     try {
       const response = await axios.post('http://localhost:8000/api/connections/register', formData);
       setStatusMessage(`[ÉXITO]: ${response.data.message}`);
-      setOpenModal(false); // Cierra el modal
+      setOpenModal(false);
     } catch (error) {
       setStatusMessage(`[ERROR]: No se pudo registrar el motor.`);
     }
   };
 
-  return (
-    <ThemeProvider theme={darkTheme}>
-      <CssBaseline />
-      <Container maxWidth="lg" sx={{ pb: 6 }}>
-
-        {/* ENCABEZADO PRINCIPAL CON INDICADOR DE ALERTAS INTERACTIVO */}
-        <Box sx={{ my: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-              DataOps Control Center
-            </Typography>
-            <Typography variant="h6" color="text.secondary">
-              Módulos de Alta Disponibilidad y Auditoría de Datos
-            </Typography>
-          </Box>
-          <Box sx={{ textAlign: 'center', bgcolor: '#0f172a', p: 1, borderRadius: 2, border: '1px solid #334155' }}>
-            <IconButton onClick={handleBellClick} title="Forzar escaneo de alertas">
-              <Badge badgeContent={alertsCount} color="error" max={99}>
-                <NotificationsActiveIcon sx={{ color: alertsCount > 0 ? '#ef4444' : '#22c55e', fontSize: 38 }} />
-              </Badge>
-            </IconButton>
-            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#94a3b8' }}>
-              Alertas Activas
-            </Typography>
-          </Box>
-        </Box>
-
-        <Grid container spacing={4}>
-          {/* SECCIÓN IZQUIERDA */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={6} sx={{ p: 4, borderRadius: 3, height: '100%' }}>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                  Orquestación de Infraestructura
-                </Typography>
-                <Button variant="outlined" color="primary" onClick={() => setOpenModal(true)} sx={{ fontWeight: 'bold' }}>
-                  + Añadir Motor
-                </Button>
+  // ==========================================
+  // PANTALLA DE LOGIN
+  // ==========================================
+  if (!isAuthenticated) {
+    return (
+      <ThemeProvider theme={futuristicTheme}>
+        <CssBaseline />
+        <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                   background: 'linear-gradient(135deg, #0a0f1c 0%, #1a2a42 100%)' }}>
+          <Fade in={true} timeout={1000}>
+            <Paper elevation={24} sx={{ p: 6, maxWidth: 400, width: '90%', textAlign: 'center', borderRadius: '24px' }}>
+              <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+                <Box sx={{ bgcolor: 'primary.main', p: 2, borderRadius: '50%', display: 'flex', boxShadow: '0 0 20px rgba(0, 242, 254, 0.5)' }}>
+                  <LockOutlinedIcon sx={{ color: '#0a0f1c', fontSize: 40 }} />
+                </Box>
               </Box>
-
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="contained" color="info" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/test-db', 'GET', 'Health Check')}>
-                    1. Probar Conexión
-                  </Button>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="contained" color="warning" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/api/queries/stress-test/1', 'POST', 'Prueba de Estrés')}>
-                    2. Simular Estrés
-                  </Button>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="contained" color="secondary" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/api/replication/sync/1', 'POST', 'Replicación')}>
-                    3. Sincronizar Esclavo
-                  </Button>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="contained" color="success" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/api/backups/full/1', 'POST', 'Backups Azure')}>
-                    4. Forzar Backup
-                  </Button>
-                </Grid>
-                <Grid item xs={12}>
-                  <Button fullWidth variant="contained" color="error" size="large" sx={{ fontWeight: 'bold' }} onClick={() => executeCommand('/api/queries/deadlock', 'POST', 'Forzar Deadlock')}>
-                    5. Forzar Deadlock (Choque Transaccional)
-                  </Button>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="contained" sx={{ bgcolor: '#9f1239', '&:hover': { bgcolor: '#be123c' }, fontWeight: 'bold' }} size="large" onClick={() => executeCommand('/api/disaster/drop-table', 'POST', 'Simular Desastre')}>
-                    6. DROP TABLE (Desastre)
-                  </Button>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="contained" sx={{ bgcolor: '#0284c7', '&:hover': { bgcolor: '#0369a1' }, fontWeight: 'bold' }} size="large" onClick={() => executeCommand('/api/disaster/restore', 'POST', 'Protocolo Recovery')}>
-                    7. Restaurar (RTO/RPO)
-                  </Button>
-                </Grid>
-                {/* NUEVO BOTÓN FASE D: DEMO CACHÉ REDIS */}
-                <Grid item xs={12}>
-                  <Button fullWidth variant="contained" sx={{ bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' }, fontWeight: 'bold' }} size="large" onClick={() => executeCommand('/api/cache/demo', 'POST', 'Rendimiento Caché')}>
-                    8. Demo Caché (Redis vs Relacional)
-                  </Button>
-                </Grid>
-              </Grid>
-
-              {/* CONSOLA DE REGISTROS */}
-              <Box sx={{ mt: 5, p: 3, bgcolor: '#000000', borderRadius: 2, border: '1px solid #334155', minHeight: '120px' }}>
-                <Typography variant="body2" sx={{ color: '#22c55e', fontFamily: 'monospace', fontSize: '15px' }}>
-                  C:\DataOps\Logs&gt; {statusMessage}
-                </Typography>
-              </Box>
-            </Paper>
-          </Grid>
-
-          {/* SECCIÓN DERECHA */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={6} sx={{ p: 4, borderRadius: 3, height: '100%', bgcolor: '#1e293b' }}>
-              <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-                Auditoría y Telemetría Analítica
+              <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.main', mb: 1 }}>
+                DataOps Vault
               </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary', mb: 4 }}>
+                Acceso autorizado requerido
+              </Typography>
+              <form onSubmit={handleLogin}>
+                <TextField fullWidth margin="normal" label="Usuario" variant="outlined"
+                  value={loginForm.username} onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
+                  sx={{ input: { color: 'white' } }} />
+                <TextField fullWidth margin="normal" label="Contraseña" type="password" variant="outlined"
+                  value={loginForm.password} onChange={(e) => setLoginForm({...loginForm, password: e.target.value})}
+                  sx={{ input: { color: 'white' }, mb: 4 }} />
+                <Button fullWidth type="submit" variant="contained" size="large" sx={{ py: 1.5, fontSize: '1.1rem' }}>
+                  Autenticar
+                </Button>
+              </form>
+            </Paper>
+          </Fade>
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="outlined" color="primary" onClick={() => loadLogsToTable('/api/connections/logs', 'Historial Health Check')}>
-                    Ver Historial Salud
-                  </Button>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Button fullWidth variant="outlined" color="error" onClick={() => loadLogsToTable('/api/queries/slow-logs', 'Consultas Lentas')}>
-                    Ver Queries Lentas
-                  </Button>
-                </Grid>
-              </Grid>
+  // ==========================================
+  // PANTALLA PRINCIPAL (DASHBOARD FUTURISTA)
+  // ==========================================
+  return (
+    <ThemeProvider theme={futuristicTheme}>
+      <CssBaseline />
+      <Box sx={{ minHeight: '100vh', background: 'radial-gradient(circle at 50% 0%, #1a2a42 0%, #0a0f1c 70%)', pt: 4, pb: 8 }}>
+        <Container maxWidth="xl">
 
-              {/* VISUALIZADOR DE TABLAS INTELIGENTE */}
-              <TableContainer sx={{ maxHeight: 280, bgcolor: '#0f172a', borderRadius: 2, border: '1px solid #334155' }}>
-                <Table stickyHeader size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ bgcolor: '#1e293b', color: '#f8fafc', fontWeight: 'bold' }}>
-                        {tableTitle ? `Logs Actuales: ${tableTitle}` : "Selecciona un log de auditoría arriba"}
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {tableData.length === 0 ? (
+          {/* ENCABEZADO */}
+          <Box sx={{ mb: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            <Box>
+              <Typography variant="h3" sx={{ fontWeight: '900', background: '-webkit-linear-gradient(45deg, #00f2fe 30%, #4facfe 90%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                DataOps Control Center
+              </Typography>
+              <Typography variant="h6" color="text.secondary" sx={{ letterSpacing: '1px' }}>
+                Módulos de Alta Disponibilidad y Auditoría
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              <Button variant="outlined" color="error" onClick={() => setIsAuthenticated(false)}>Cerrar Sesión</Button>
+              <Paper sx={{ px: 3, py: 1, display: 'flex', alignItems: 'center', gap: 2, borderRadius: '50px' }}>
+                <Typography variant="body1" sx={{ fontWeight: 'bold' }}>Alertas Activas</Typography>
+                <IconButton onClick={() => executeCommand('/api/alerts/scan/1', 'POST', 'Escaneo Alertas')} sx={{ bgcolor: 'rgba(0,0,0,0.2)' }}>
+                  <Badge badgeContent={alertsCount} color="error" max={99}>
+                    <NotificationsActiveIcon sx={{ color: alertsCount > 0 ? '#ff0844' : '#43e97b' }} />
+                  </Badge>
+                </IconButton>
+              </Paper>
+            </Box>
+          </Box>
+
+          <Grid container spacing={4}>
+            {/* SECCIÓN IZQUIERDA: MANDOS */}
+            <Grid item xs={12} lg={7}>
+              <Paper sx={{ p: 4, height: '100%' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Panel de Orquestación</Typography>
+                  <Button variant="contained" onClick={() => setOpenModal(true)} sx={{ borderRadius: '50px', px: 3 }}>
+                    + Nuevo Motor
+                  </Button>
+                </Box>
+
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <Button fullWidth variant="contained" color="secondary" size="large" onClick={() => executeCommand('/test-db', 'GET', 'Health Check')} sx={{ height: '60px' }}>
+                      1. Health Check
+                    </Button>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Button fullWidth variant="contained" color="warning" size="large" onClick={() => executeCommand('/api/queries/stress-test/1', 'POST', 'Prueba de Estrés')} sx={{ height: '60px' }}>
+                      2. Stress Test
+                    </Button>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Button fullWidth variant="contained" color="primary" size="large" onClick={() => executeCommand('/api/replication/sync/1', 'POST', 'Replicación')} sx={{ height: '60px' }}>
+                      3. Sync Réplica
+                    </Button>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Button fullWidth variant="contained" color="success" size="large" onClick={() => executeCommand('/api/backups/full/1', 'POST', 'Backups Azure')} sx={{ height: '60px' }}>
+                      4. Backup a Nube
+                    </Button>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Button fullWidth variant="contained" sx={{ bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' }, height: '60px' }} onClick={() => executeCommand('/api/cache/demo', 'POST', 'Rendimiento Caché')}>
+                      8. Demo Redis Caché
+                    </Button>
+                  </Grid>
+
+                  <Grid item xs={12} sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'error.main', mb: 1, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px' }}>
+                      Zona de Desastres (Cuidado)
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Button fullWidth variant="outlined" color="error" onClick={() => executeCommand('/api/queries/deadlock', 'POST', 'Forzar Deadlock')}>
+                      5. Deadlock
+                    </Button>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Button fullWidth variant="contained" color="error" onClick={() => executeCommand('/api/disaster/drop-table', 'POST', 'Simular Desastre')}>
+                      6. DROP TABLE
+                    </Button>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Button fullWidth variant="contained" color="info" onClick={() => executeCommand('/api/disaster/restore', 'POST', 'Protocolo Recovery')}>
+                      7. Recovery RTO/RPO
+                    </Button>
+                  </Grid>
+                </Grid>
+
+                {/* CONSOLA DE TERMINAL */}
+                <Box sx={{ mt: 5, p: 3, bgcolor: 'rgba(0,0,0,0.6)', borderRadius: '16px', borderLeft: '4px solid #00f2fe', minHeight: '120px' }}>
+                  <Typography variant="body2" sx={{ color: '#43e97b', fontFamily: '"Fira Code", monospace', fontSize: '15px' }}>
+                    root@dataops-vault:~# {statusMessage}
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
+
+            {/* SECCIÓN DERECHA: TABLAS */}
+            <Grid item xs={12} lg={5}>
+              <Paper sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 4 }}>Auditoría Telemetría</Typography>
+
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                  <Grid item xs={6}>
+                    <Button fullWidth variant="outlined" color="secondary" onClick={() => loadLogsToTable('/api/connections/logs', 'Health Check Logs')}>
+                      Historial Salud
+                    </Button>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Button fullWidth variant="outlined" color="warning" onClick={() => loadLogsToTable('/api/queries/slow-logs', 'Slow Queries')}>
+                      Queries Lentas
+                    </Button>
+                  </Grid>
+                </Grid>
+
+                <TableContainer sx={{ flexGrow: 1, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <Table stickyHeader size="small">
+                    <TableHead>
                       <TableRow>
-                        <TableCell sx={{ color: '#64748b', textAlign: 'center', py: 4 }}>
-                          No hay registros cargados en esta vista.
+                        <TableCell sx={{ bgcolor: 'rgba(17, 25, 40, 0.9)', color: 'primary.main', fontWeight: 'bold' }}>
+                          {tableTitle ? `Logs: ${tableTitle}` : "Selecciona una vista"}
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      tableData.slice(0, 30).map((row, index) => (
-                        <TableRow key={index} hover>
-                          <TableCell sx={{ color: '#cbd5e1', fontFamily: 'monospace', fontSize: '11px', borderBottom: '1px solid #1e293b' }}>
-                            {JSON.stringify(row)}
-                          </TableCell>
+                    </TableHead>
+                    <TableBody>
+                      {tableData.length === 0 ? (
+                        <TableRow>
+                          <TableCell sx={{ color: '#64748b', textAlign: 'center', py: 8 }}>Esperando datos de la base de control...</TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-            </Paper>
+                      ) : (
+                        tableData.slice(0, 30).map((row, index) => (
+                          <TableRow key={index} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                            <TableCell sx={{ color: '#cbd5e1', fontFamily: 'monospace', fontSize: '12px' }}>
+                              {JSON.stringify(row)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+            </Grid>
           </Grid>
-        </Grid>
 
-        {/* MODAL FLOTANTE DE REGISTRO */}
-        <Dialog open={openModal} onClose={() => setOpenModal(false)} PaperProps={{ sx: { bgcolor: '#1e293b', color: '#f8fafc' } }}>
-          <DialogTitle sx={{ color: '#22c55e', fontWeight: 'bold' }}>Registrar Nuevo Motor de BD</DialogTitle>
-          <DialogContent>
-            <TextField select fullWidth margin="dense" label="Motor de Base de Datos"
-              value={formData.engine} onChange={(e) => setFormData({...formData, engine: e.target.value})}
-              sx={{ input: { color: 'white' }, label: { color: '#94a3b8' }, bgcolor: '#0f172a', mt: 2 }}
-            >
-              <MenuItem value="PostgreSQL">PostgreSQL</MenuItem>
-              <MenuItem value="SQL Server">SQL Server</MenuItem>
-              <MenuItem value="Oracle">Oracle DB</MenuItem>
-            </TextField>
-            <TextField fullWidth margin="dense" label="Host (IP o URL)" placeholder="ej. 192.168.1.100"
-              onChange={(e) => setFormData({...formData, host: e.target.value})}
-              InputProps={{ style: { color: 'white' } }} InputLabelProps={{ style: { color: '#94a3b8' } }} sx={{ bgcolor: '#0f172a', mt: 2 }} />
-            <TextField fullWidth margin="dense" label="Puerto" placeholder="ej. 5432"
-              onChange={(e) => setFormData({...formData, port: e.target.value})}
-              InputProps={{ style: { color: 'white' } }} InputLabelProps={{ style: { color: '#94a3b8' } }} sx={{ bgcolor: '#0f172a', mt: 2 }} />
-            <TextField fullWidth margin="dense" label="Usuario"
-              onChange={(e) => setFormData({...formData, username: e.target.value})}
-              InputProps={{ style: { color: 'white' } }} InputLabelProps={{ style: { color: '#94a3b8' } }} sx={{ bgcolor: '#0f172a', mt: 2 }} />
-            <TextField fullWidth margin="dense" label="Contraseña" type="password"
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-              InputProps={{ style: { color: 'white' } }} InputLabelProps={{ style: { color: '#94a3b8' } }} sx={{ bgcolor: '#0f172a', mt: 2 }} />
-          </DialogContent>
-          <DialogActions sx={{ p: 3 }}>
-            <Button onClick={() => setOpenModal(false)} sx={{ color: '#94a3b8' }}>Cancelar</Button>
-            <Button onClick={handleRegisterSubmit} variant="contained" color="primary">Guardar Motor</Button>
-          </DialogActions>
-        </Dialog>
+          {/* MODAL */}
+          <Dialog open={openModal} onClose={() => setOpenModal(false)} PaperProps={{ sx: { bgcolor: '#1a2a42', backgroundImage: 'none' } }}>
+            <DialogTitle sx={{ color: 'primary.main', fontWeight: 'bold' }}>Conectar Motor DB</DialogTitle>
+            <DialogContent>
+              <TextField select fullWidth margin="dense" label="Motor" value={formData.engine} onChange={(e) => setFormData({...formData, engine: e.target.value})} sx={{ mt: 2 }}>
+                <MenuItem value="PostgreSQL">PostgreSQL</MenuItem>
+                <MenuItem value="SQL Server">SQL Server</MenuItem>
+                <MenuItem value="Oracle">Oracle DB</MenuItem>
+              </TextField>
+              <TextField fullWidth margin="dense" label="Host" onChange={(e) => setFormData({...formData, host: e.target.value})} sx={{ mt: 2 }} />
+              <TextField fullWidth margin="dense" label="Puerto" onChange={(e) => setFormData({...formData, port: e.target.value})} sx={{ mt: 2 }} />
+              <TextField fullWidth margin="dense" label="Usuario" onChange={(e) => setFormData({...formData, username: e.target.value})} sx={{ mt: 2 }} />
+              <TextField fullWidth margin="dense" label="Contraseña" type="password" onChange={(e) => setFormData({...formData, password: e.target.value})} sx={{ mt: 2 }} />
+            </DialogContent>
+            <DialogActions sx={{ p: 3 }}>
+              <Button onClick={() => setOpenModal(false)} color="inherit">Cancelar</Button>
+              <Button onClick={handleRegisterSubmit} variant="contained">Guardar</Button>
+            </DialogActions>
+          </Dialog>
 
-      </Container>
+        </Container>
+      </Box>
     </ThemeProvider>
   );
 }
