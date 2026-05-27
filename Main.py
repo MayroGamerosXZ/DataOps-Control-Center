@@ -12,14 +12,11 @@ from pydantic import BaseModel
 # Cargar variables de entorno
 load_dotenv()
 
+# Mantenemos solo la base de datos y el planificador
 from App.Database.Connection import get_db_connection
 from App.services.Health_check import run_health_check
-from App.Routes.Connections import router as connections_router
-from App.Routes.Queries import router as queries_router
-from App.Routes.Backups import router as backups_router
-from App.Routes.Replication import router as replication_router
-from App.Routes.Cache import router as cache_router
-from App.Routes.Alerts import router as alerts_router
+
+# ¡ROUTERS ELIMINADOS PARA EVITAR EL SECUESTRO DE RUTAS!
 
 app = FastAPI(
     title="DataOps Control Center API",
@@ -36,7 +33,7 @@ app.add_middleware(
 )
 
 # ==========================================
-# --- MIDDLEWARE ANTI-CACHÉ (Fuerza los correos) ---
+# --- MIDDLEWARE ANTI-CACHÉ ---
 # ==========================================
 @app.middleware("http")
 async def disable_cache(request: Request, call_next):
@@ -57,13 +54,6 @@ def start_scheduler():
 @app.on_event("shutdown")
 def stop_scheduler():
     scheduler.shutdown()
-
-app.include_router(connections_router)
-app.include_router(queries_router)
-app.include_router(replication_router)
-app.include_router(cache_router)
-app.include_router(backups_router)
-app.include_router(alerts_router)
 
 class DatabaseConnection(BaseModel):
     engine: str
@@ -111,7 +101,7 @@ async def register_database(db_config: DatabaseConnection):
     return {"status": "success", "message": f"Motor {db_config.engine} registrado."}
 
 # ==========================================
-# --- ENDPOINTS DEMO (TODOS ENVÍAN CORREO) ---
+# --- ENDPOINTS DEMO (TODOS ENVÍAN CORREO 100% GARANTIZADO) ---
 # ==========================================
 
 # 1. HEALTH CHECK
