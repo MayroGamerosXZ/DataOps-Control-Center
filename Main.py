@@ -68,8 +68,7 @@ class DatabaseConnection(BaseModel):
 # ==========================================
 # --- FUNCIÓN REAL DE ENVÍO DE CORREO SMTP (GMAIL) ---
 # ==========================================
-# MEJORA: Por defecto todos los correos irán a tu correo universitario para la demo
-def enviar_correo_alerta(asunto: str, mensaje_cuerpo: str, destinatario: str = "2890-23-11428@miumg.edu.gt"):
+def enviar_correo_alerta(asunto: str, mensaje_cuerpo: str, destinatario: str = "mbarriosg8@miumg.edu.gt"):
     print(f"--- [DEBUG SMTP] Iniciando envío a {destinatario} ---")
     try:
         sender_email = os.getenv("GMAIL_USER")
@@ -79,7 +78,8 @@ def enviar_correo_alerta(asunto: str, mensaje_cuerpo: str, destinatario: str = "
             print("[ERROR CRÍTICO] Credenciales GMAIL_USER o GMAIL_PASS no configuradas en .env")
             return
 
-        msg = MIMEText(mensaje_cuerpo)
+        # LA SOLUCIÓN ESTÁ AQUÍ: 'plain', 'utf-8' permite enviar tildes y eñes
+        msg = MIMEText(mensaje_cuerpo, 'plain', 'utf-8')
         msg['Subject'] = f"[ALERTA DATAOPS] - {asunto}"
         msg['From'] = sender_email
         msg['To'] = destinatario
@@ -110,7 +110,6 @@ def test_db():
 async def register_database(db_config: DatabaseConnection):
     return {"status": "success", "message": f"Motor {db_config.engine} registrado con éxito."}
 
-# MEJORA: Datos completos restaurados para las tablas de React
 @app.get("/api/connections/logs")
 async def get_connection_logs():
     logs_db = [
@@ -122,7 +121,6 @@ async def get_connection_logs():
     ]
     return {"status": "success", "records": logs_db}
 
-# MEJORA: Datos completos de Planes de ejecución restaurados
 @app.get("/api/queries/slow-logs")
 async def get_slow_queries_logs():
     raw_queries = [
@@ -137,7 +135,6 @@ async def get_slow_queries_logs():
         else: q["clasificacion"] = "Critical"
     return {"status": "success", "records": raw_queries}
 
-# MEJORA: Detalles JSON completos para que React los muestre en verde en la consola
 @app.post("/api/queries/deadlock")
 async def trigger_deadlock(background_tasks: BackgroundTasks):
     deadlock_event = {
@@ -206,9 +203,30 @@ async def cache_performance_demo():
 
 @app.post("/api/alerts/scan/{db_id}")
 async def scan_and_alert(db_id: int, background_tasks: BackgroundTasks):
+    # 1. Simulación de los 3 eventos exactos de la rúbrica
     alertas = [
-        {"nivel": "CRITICAL", "evento": "Fallo en Backup", "accion": "Correo disparado."},
-        {"nivel": "WARNING", "evento": "CPU > 85%", "accion": "Registrado."}
+        {"nivel": "WARNING", "evento": "El uso de CPU supera el 85%", "accion": "Notificación enviada."},
+        {"nivel": "CRITICAL", "evento": "Ocurre un Backup fallido", "accion": "Reintento programado y notificación enviada."},
+        {"nivel": "CRITICAL", "evento": "El uso de Disco supera el 90%", "accion": "Notificación enviada al DBA."}
     ]
-    background_tasks.add_task(enviar_correo_alerta, "Reporte de Escaneo de Alertas", "Se detectaron anomalías en el sistema de base de datos.")
-    return {"status": "warning", "message": "Escaneo completado. Correos enviados.", "details": {"alertas": alertas}}
+
+    # 2. Formato del correo electrónico corporativo
+    cuerpo_correo = f"""
+=========================================
+DATAOPS CONTROL CENTER - REPORTE DE ESCANEO
+=========================================
+Se han detectado múltiples anomalías en el contenedor de Base de Datos {db_id}.
+
+DETALLE DE EVENTOS:
+- [WARNING] El uso de CPU supera el 85%
+- [CRITICAL] Ocurre un Backup fallido
+- [CRITICAL] El uso de Disco supera el 90% (Peligro de detención de motor)
+
+Por favor, ingrese al Power BI o al panel web para revisar el detalle histórico.
+=========================================
+    """
+
+    # 3. Disparo del correo
+    background_tasks.add_task(enviar_correo_alerta, f"Reporte de Escaneo - Motor {db_id}", cuerpo_correo)
+
+    return {"status": "warning", "message": "Escaneo completado. Anomalías detectadas.", "details": {"alertas": alertas}}
