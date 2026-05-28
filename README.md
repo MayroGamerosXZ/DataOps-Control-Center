@@ -62,7 +62,7 @@ La arquitectura está diseñada bajo un patrón híbrido para evitar el colapso 
 
 ---
 
-## 💻 Stack Tecnológico
+### 💻 Stack Tecnológico
 
 | Capa | Tecnologías |
 | :--- | :--- |
@@ -138,7 +138,7 @@ npm install
 npm start
 ```
 
-🌐 Métricas y Accesos
+## 🌐 Métricas y Accesos
 Una vez desplegado, los servicios estarán disponibles en los siguientes puertos locales:
 
 🖥️ UI (React): http://localhost:3001
@@ -149,7 +149,7 @@ Una vez desplegado, los servicios estarán disponibles en los siguientes puertos
 
 🗄️ SQL Server (SSMS/Power BI): localhost,1434 (User: sa)
 
-👨‍💻 Autor
+##👨‍💻 Autor
 Mayro Geovanni Barrios Gameros Carné: 2890-23-11428
 
 Facultad de Ingeniería en Sistemas Universidad Mariano Gálvez de Guatemala, Sede Retalhuleu.
