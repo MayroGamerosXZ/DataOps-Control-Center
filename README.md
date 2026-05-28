@@ -149,7 +149,7 @@ Una vez desplegado, los servicios estarán disponibles en los siguientes puertos
 
 🗄️ SQL Server (SSMS/Power BI): localhost,1434 (User: sa)
 
-##👨‍💻 Autor
+## 👨‍💻 Autor
 Mayro Geovanni Barrios Gameros Carné: 2890-23-11428
 
 Facultad de Ingeniería en Sistemas Universidad Mariano Gálvez de Guatemala, Sede Retalhuleu.
