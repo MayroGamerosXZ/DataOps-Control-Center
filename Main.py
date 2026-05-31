@@ -17,6 +17,7 @@ from App.services.Health_check import run_health_check
 
 from App.Routes.Connections import router as connections_router
 from App.Routes.Queries import router as queries_router
+from App.Routes.Databases import router as databases_router
 from App.Routes.Backups import router as backups_router
 from App.Routes.Replication import router as replication_router
 from App.Routes.Cache import router as cache_router
@@ -157,16 +158,6 @@ async def sync_replication(db_id: int, background_tasks: BackgroundTasks):
 
     background_tasks.add_task(enviar_correo_alerta, f"MÓDULO 6: Replicación Distribuida ({current['estado']})", f"Lag actual medido en el nodo esclavo: {current['lag']} segundos.\nAnálisis Teorema CAP: {current['cap']}")
     return {"status": "warning" if current['alerta'] else "success", "message": message, "details": current}
-
-# 4. BACKUP A NUBE
-@app.get("/api/backups/{backup_type}/{db_id}")
-@app.post("/api/backups/{backup_type}/{db_id}")
-async def execute_cloud_backup(backup_type: str, db_id: int, background_tasks: BackgroundTasks):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"backup_{backup_type}_db{db_id}_{timestamp}.bak"
-    file_hash = hashlib.md5(filename.encode()).hexdigest()
-    background_tasks.add_task(enviar_correo_alerta, f"MÓDULO 5: Backup {backup_type.upper()} Transferido", f"El respaldo se ha completado y almacenado en Azure Blob Storage.\nArchivo: {filename}\nIntegridad MD5: {file_hash}")
-    return {"status": "success", "message": f"Backup {backup_type.upper()} transferido a Azure.", "details": {"archivo": filename, "nube": "Azure Blob Storage", "hash_md5": file_hash, "integridad": "VERIFICADO"}}
 
 # 5. DEADLOCK
 @app.get("/api/queries/deadlock")
