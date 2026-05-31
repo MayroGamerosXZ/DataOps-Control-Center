@@ -20,6 +20,7 @@ from App.Routes.Queries import router as queries_router
 from App.Routes.Databases import router as databases_router
 from App.Routes.Audit import router as audit_router
 from App.Routes.AzureCloud import router as azure_router
+from App.Routes.Telemetry import router as telemetry_router
 from App.Routes.Backups import router as backups_router
 from App.Routes.Replication import router as replication_router
 from App.Routes.Cache import router as cache_router
