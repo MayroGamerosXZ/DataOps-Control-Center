@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from App.Database.Connection import get_db_connection
+from App.services.Audit_service import log_audit
 from psycopg2.extras import RealDictCursor
 from faker import Faker
 import time
@@ -63,10 +64,12 @@ def execute_query(req: QueryRequest):
         # Si es una consulta de lectura
         if req.query.strip().upper().startswith("SELECT") or req.query.strip().upper().startswith("WITH") or req.query.strip().upper().startswith("SHOW"):
             records = cursor.fetchall()
+            log_audit("Usuario", "PostgreSQL", f"Consulta SELECT", len(records), "Completado")
             return {"status": "success", "records": records, "message": f"{len(records)} filas recuperadas."}
         else:
             conn.commit()
             affected = cursor.rowcount
+            log_audit("Usuario", "PostgreSQL", f"Consulta Modificadora", affected, "Completado")
             return {"status": "success", "records": [], "message": f"Operación exitosa. {affected} filas afectadas."}
     except Exception as e:
         conn.rollback()
@@ -144,6 +147,8 @@ def inject_data(req: InjectRequest):
             
         conn.commit()
         end_time = time.time()
+        
+        log_audit("Usuario", "PostgreSQL", f"Inyección de Datos ({req.table_name})", inserted_count, "Completado")
         
         return {
             "status": "success", 
