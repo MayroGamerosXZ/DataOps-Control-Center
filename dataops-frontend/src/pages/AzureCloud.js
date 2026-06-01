@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, IconButton, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, IconButton, CircularProgress, Alert, Grid, TextField } from '@mui/material';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import axios from 'axios';
 
@@ -7,6 +7,9 @@ const AzureCloud = () => {
   const [backups, setBackups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [dbId, setDbId] = useState('2'); // Default to motor test 1
+  const [message, setMessage] = useState('');
 
   const fetchBlobs = async () => {
     setLoading(true);
@@ -27,15 +30,71 @@ const AzureCloud = () => {
   }, []);
 
   const handleDownload = (blobName) => {
-    // Open download link in a new tab/window
     window.open(`http://localhost:8000/api/azure/download/${blobName}`, '_blank');
+  };
+
+  const triggerBackup = async (type) => {
+    setBackupLoading(true);
+    setMessage(`Iniciando Backup ${type} en el motor con ID ${dbId}...`);
+    try {
+      const endpoint = type === 'FULL' ? `/api/backups/full/${dbId}` : `/api/backups/diff/${dbId}`;
+      const response = await axios.post(`http://localhost:8000${endpoint}`);
+      setMessage(response.data.message);
+      fetchBlobs(); // Refresh list after backup
+    } catch (err) {
+      setMessage(`Error: ${err.response?.data?.detail || err.message}`);
+    }
+    setBackupLoading(false);
   };
 
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold' }}>Centro de Control Cloud (Azure)</Typography>
       
-      <Paper sx={{ p: 4, minHeight: '500px' }}>
+      <Grid container spacing={4} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={6}>
+            <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>Generador de Backups Local a Cloud</Typography>
+                <TextField 
+                  fullWidth 
+                  margin="dense" 
+                  label="ID del Motor (Ej: 2 para Test DB)" 
+                  type="number" 
+                  value={dbId}
+                  onChange={(e) => setDbId(e.target.value)}
+                  sx={{ mb: 2 }}
+                />
+                <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                        <Button 
+                          variant="contained" 
+                          color="primary" 
+                          fullWidth 
+                          onClick={() => triggerBackup('FULL')}
+                          disabled={backupLoading}
+                        >
+                          Generar Backup FULL
+                        </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                        <Button 
+                          variant="contained" 
+                          color="secondary" 
+                          fullWidth 
+                          onClick={() => triggerBackup('DIFF')}
+                          disabled={backupLoading}
+                        >
+                          Generar Backup DIFF
+                        </Button>
+                    </Grid>
+                </Grid>
+                {backupLoading && <CircularProgress sx={{ mt: 2 }} size={24} />}
+                {message && <Typography variant="body2" sx={{ mt: 2, color: 'success.main' }}>{message}</Typography>}
+            </Paper>
+        </Grid>
+      </Grid>
+
+      <Paper sx={{ p: 4, minHeight: '400px' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h6">Explorador de Azure Blob Storage</Typography>
           <Button variant="contained" color="success" onClick={fetchBlobs} disabled={loading}>
