@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from App.Database.Connection import get_db_connection
 from psycopg2.extras import RealDictCursor
+from App.Routes.Audit import mock_logs # Importamos los logs simulados para que la telemetría tenga datos
 
 router = APIRouter(prefix="/api/telemetry", tags=["Telemetría y Analítica (Fase 5)"])
 
@@ -13,60 +14,52 @@ def get_telemetry_stats():
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # 1. Obtener proporciones de estado de auditoría (Exitosos vs Fallidos)
+        # 1. Obtener proporciones de estado de auditoría (Exitosos vs Fallidos) de la BD (tx_log)
+        # Manejamos el caso donde tx_log pueda estar vacía devolviendo 0 si no hay resultados
         cursor.execute("""
-            SELECT estado, SUM(cantidad) as cantidad
-            FROM (
-                SELECT estado, COUNT(*) as cantidad 
-                FROM AUDIT_LOGS 
-                GROUP BY estado
-                
-                UNION ALL
-                
-                SELECT 
-                    CASE 
-                        WHEN operacion = 'ERROR' THEN 'Error' 
-                        ELSE 'Completado' 
-                    END as estado,
-                    COUNT(*) as cantidad
-                FROM tx_log
-                GROUP BY 
-                    CASE 
-                        WHEN operacion = 'ERROR' THEN 'Error' 
-                        ELSE 'Completado' 
-                    END
-            ) as combined_estados
-            GROUP BY estado
+            SELECT 
+                COALESCE(
+                    SUM(CASE WHEN operacion = 'ERROR' THEN 1 ELSE 0 END), 0
+                ) as fallidos,
+                COALESCE(
+                    SUM(CASE WHEN operacion != 'ERROR' THEN 1 ELSE 0 END), 0
+                ) as exitosos
+            FROM tx_log
         """)
-        audit_stats = cursor.fetchall()
+        tx_stats = cursor.fetchone()
         
-        # Formatear para el pie chart (Exitosos, Errores, Otros)
-        exitosos = sum(row['cantidad'] for row in audit_stats if row['estado'] == 'Completado')
-        fallidos = sum(row['cantidad'] for row in audit_stats if row['estado'] == 'Error')
-        otros = sum(row['cantidad'] for row in audit_stats if row['estado'] not in ('Completado', 'Error'))
+        exitosos_tx = tx_stats['exitosos'] if tx_stats else 0
+        fallidos_tx = tx_stats['fallidos'] if tx_stats else 0
         
-        # 2. Obtener motores y cantidad de operaciones combinadas (Audit + Stress Test)
+        # Sumamos los logs simulados de auditoría
+        exitosos_audit = sum(1 for log in mock_logs if log['estado'] == 'Completado')
+        fallidos_audit = sum(1 for log in mock_logs if log['estado'] == 'Error')
+
+        exitosos = exitosos_tx + exitosos_audit
+        fallidos = fallidos_tx + fallidos_audit
+        otros = 0
+
+        # 2. Obtener motores y cantidad de operaciones combinadas
         cursor.execute("""
-            SELECT motor_afectado, SUM(cantidad) as cantidad
-            FROM (
-                SELECT motor_afectado, COUNT(*) as cantidad 
-                FROM AUDIT_LOGS 
-                WHERE motor_afectado IS NOT NULL 
-                GROUP BY motor_afectado
-                
-                UNION ALL
-                
-                SELECT c.engine as motor_afectado, COUNT(*) as cantidad
-                FROM tx_log t
-                JOIN CONNECTIONS c ON t.db_id = c.id
-                GROUP BY c.engine
-            ) as combined
-            GROUP BY motor_afectado
+            SELECT c.engine as motor_afectado, COUNT(*) as cantidad
+            FROM tx_log t
+            JOIN CONNECTIONS c ON t.db_id = c.id
+            GROUP BY c.engine
         """)
-        motor_stats = cursor.fetchall()
+        motor_tx_stats = cursor.fetchall()
         
-        motores_labels = [row['motor_afectado'] for row in motor_stats]
-        motores_data = [row['cantidad'] for row in motor_stats]
+        # Diccionario para combinar conteos de BD y simulados
+        motores_combinados = {}
+        for row in motor_tx_stats:
+            motores_combinados[row['motor_afectado']] = row['cantidad']
+
+        for log in mock_logs:
+            # Simplificar el nombre del motor para que coincida con "PostgreSQL" o "SQL Server"
+            motor = "PostgreSQL" if "postgres" in log['motor_afectado'] else "SQL Server"
+            motores_combinados[motor] = motores_combinados.get(motor, 0) + 1
+
+        motores_labels = list(motores_combinados.keys())
+        motores_data = list(motores_combinados.values())
 
         return {
             "status": "success",
@@ -81,7 +74,7 @@ def get_telemetry_stats():
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Error procesando telemetría: {str(e)}")
     finally:
         cursor.close()
         conn.close()

@@ -7,6 +7,38 @@ from App.services.Alerts_service import add_custom_alert, clear_custom_alerts
 
 router = APIRouter(prefix="/api/backups", tags=["Backup & Recovery (Módulo 5)"])
 
+@router.get("/history")
+def get_backup_history():
+    """Obtiene el historial de todos los backups (exitosos y fallidos) desde la BD de control."""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Error conectando a la BD de control")
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # Unimos con la tabla de conexiones para obtener el nombre del motor
+        cursor.execute("""
+            SELECT 
+                h.id,
+                c.nombre as motor_nombre,
+                h.backup_type,
+                h.status,
+                h.file_size_mb,
+                h.duration_seconds,
+                h.cloud_url,
+                h.timestamp
+            FROM BACKUP_HISTORY h
+            JOIN CONNECTIONS c ON h.db_id = c.id
+            ORDER BY h.timestamp DESC
+            LIMIT 100;
+        """)
+        history = cursor.fetchall()
+        return {"status": "success", "history": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al consultar historial: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
+
 def execute_backup(db_id: int, background_tasks: BackgroundTasks, backup_type: str = "FULL", force_fail: bool = False):
     """Lógica centralizada para ejecutar backups, con capacidad de forzar fallos para pruebas."""
     conn = get_db_connection()

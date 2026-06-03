@@ -16,9 +16,10 @@ const Telemetry = () => {
       try {
         const response = await axios.get('http://localhost:8000/api/telemetry/stats');
         setStats(response.data);
+        setError(''); // Limpiar errores previos
       } catch (err) {
         console.error("Error fetching telemetry stats", err);
-        setError("Error cargando los datos de telemetría.");
+        setError("Error cargando los datos de telemetría. Verifica la conexión con FastAPI.");
       } finally {
         setLoading(false);
       }
@@ -119,12 +120,12 @@ const Telemetry = () => {
             </Box>
             <Box sx={{ width: '100%', flexGrow: 1, bgcolor: 'rgba(0,0,0,0.5)', borderRadius: 2, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
               <iframe 
-                src="http://localhost:3000/d-solo/dataops_dash/dataops-infrastructure" 
+                src="http://localhost:3000/d/dataops001/dataops-control-center-monitoreo?orgId=1&refresh=5s&theme=dark&kiosk=tv"
                 width="100%" 
                 height="100%" 
                 frameBorder="0"
                 title="Grafana Dashboard"
-                onError={(e) => e.target.style.display = 'none'} // Si grafana no está, falla silenciosamente y muestra fondo negro
+                onError={(e) => e.target.style.display = 'none'}
               ></iframe>
             </Box>
           </Paper>

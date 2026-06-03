@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Grid, Paper, Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, MenuItem, Select, FormControl, InputLabel, CircularProgress, Alert } from '@mui/material';
+import {
+  Grid, Paper, Box, Typography, TextField, Button, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, MenuItem, Select,
+  FormControl, InputLabel, CircularProgress, Alert, List, ListItem,
+  ListItemText, Chip
+} from '@mui/material';
 import axios from 'axios';
 
 const Databases = () => {
@@ -29,7 +34,7 @@ const Databases = () => {
       const response = await axios.get('http://localhost:8000/api/connections/');
       if (response.data.status === 'success') {
         setConnections(response.data.connections);
-        if (response.data.connections.length > 0) {
+        if (response.data.connections.length > 0 && !selectedDb) {
           setSelectedDb(response.data.connections[0].id);
         }
       }
@@ -204,8 +209,5 @@ const Databases = () => {
     </Grid>
   );
 };
-
-// Necesario importar List, ListItem, ListItemText, Chip para la lista de bases de datos
-import { List, ListItem, ListItemText, Chip } from '@mui/material';
 
 export default Databases;

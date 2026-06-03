@@ -150,7 +150,7 @@ async def sync_replication(db_id: int, background_tasks: BackgroundTasks):
     message = f"Lag medido: {current['lag']}s."
     if current['alerta']: message = "¡DESINCRONIZACIÓN! " + message
 
-    # LÓGICA DE ALERTA AÑADIDA
+    # LÓGICA DE ALERTA
     if current['lag'] > 10:
         add_custom_alert(
             name="ReplicationLag",
