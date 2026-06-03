@@ -14,17 +14,15 @@ load_dotenv()
 
 from App.Database.Connection import get_db_connection
 from App.services.Health_check import run_health_check
+from App.services.Alerts_service import add_custom_alert, clear_custom_alerts
 
 from App.Routes.Connections import router as connections_router
 from App.Routes.Queries import router as queries_router
-from App.Routes.Databases import router as databases_router
-from App.Routes.Audit import router as audit_router
-from App.Routes.AzureCloud import router as azure_router
-from App.Routes.Telemetry import router as telemetry_router
 from App.Routes.Backups import router as backups_router
 from App.Routes.Replication import router as replication_router
 from App.Routes.Cache import router as cache_router
 from App.Routes.Alerts import router as alerts_router
+from App.Routes.Audit import router as audit_router
 
 app = FastAPI(
     title="DataOps Control Center API",
@@ -112,13 +110,6 @@ def test_db(background_tasks: BackgroundTasks):
     background_tasks.add_task(enviar_correo_alerta, "MÓDULO 1: Health Check Ejecutado", "Se ha validado la conexión general con la base de datos. Estado: ONLINE y operando correctamente.")
     return {"status": "success", "message": "Conexión a la base de datos exitosa."}
 
-# 2. STRESS TEST (Ruta detectada: /api/queries/stress-test/{db_id})
-@app.get("/api/queries/stress-test/{db_id}")
-@app.post("/api/queries/stress-test/{db_id}")
-async def run_stress_test_demo(db_id: int, background_tasks: BackgroundTasks):
-    background_tasks.add_task(enviar_correo_alerta, "MÓDULO 4: Prueba de Estrés (Concurrencia)", f"Prueba de estrés completada en el motor {db_id}. Se simularon 100 usuarios concurrentes y el motor se mantuvo estable.")
-    return {"status": "success", "message": "Prueba de estrés completada con 100 usuarios concurrentes."}
-
 # ==========================================
 # --- RESTO DE ENDPOINTS DEMO (GARANTIZADOS) ---
 # ==========================================
@@ -159,13 +150,38 @@ async def sync_replication(db_id: int, background_tasks: BackgroundTasks):
     message = f"Lag medido: {current['lag']}s."
     if current['alerta']: message = "¡DESINCRONIZACIÓN! " + message
 
+    # LÓGICA DE ALERTA AÑADIDA
+    if current['lag'] > 10:
+        add_custom_alert(
+            name="ReplicationLag",
+            severity="warning",
+            summary=f"Lag de replicación elevado: {current['lag']}s",
+            description=f"El lag entre el nodo maestro y la réplica {db_id} ha superado los 10 segundos."
+        )
+    else:
+        # Si el lag vuelve a la normalidad, limpiamos la alerta
+        clear_custom_alerts(alert_name="ReplicationLag")
+
     background_tasks.add_task(enviar_correo_alerta, f"MÓDULO 6: Replicación Distribuida ({current['estado']})", f"Lag actual medido en el nodo esclavo: {current['lag']} segundos.\nAnálisis Teorema CAP: {current['cap']}")
     return {"status": "warning" if current['alerta'] else "success", "message": message, "details": current}
 
 # 5. DEADLOCK
+deadlock_counter = 0
 @app.get("/api/queries/deadlock")
 @app.post("/api/queries/deadlock")
 async def trigger_deadlock(background_tasks: BackgroundTasks):
+    global deadlock_counter
+    deadlock_counter += 1
+    
+    # LÓGICA DE ALERTA AÑADIDA
+    if deadlock_counter > 3:
+        add_custom_alert(
+            name="DeadlockRecurrente",
+            severity="critical",
+            summary="Se han detectado más de 3 deadlocks",
+            description=f"El sistema ha registrado {deadlock_counter} deadlocks consecutivos. Se requiere investigación."
+        )
+
     background_tasks.add_task(enviar_correo_alerta, "MÓDULO 4: Deadlock Crítico Detectado", "Se ha detectado un bloqueo mutuo en el motor SQL Server. La transacción fue abortada automáticamente.")
     return {"status": "warning", "message": "¡Interbloqueo detectado! Correo en proceso.", "details": {"evento": "DEADLOCK_DETECTED", "motor": "SQL Server Test"}}
 
@@ -190,23 +206,6 @@ async def cache_performance_demo(background_tasks: BackgroundTasks):
     background_tasks.add_task(enviar_correo_alerta, "MÓDULO 7: Rendimiento Redis Caché", "Prueba de caché exitosa. La latencia disminuyó un 90.7% (de 412ms a 38ms).")
     return {"status": "success", "message": "Evaluación Caché completada.", "details": {"mejora": "Latencia reducida 90.7%"}}
 
-# ESCÁNER DE ALERTAS
-@app.get("/api/alerts/scan/{db_id}")
-@app.post("/api/alerts/scan/{db_id}")
-async def scan_and_alert(db_id: int, background_tasks: BackgroundTasks):
-    cuerpo_correo = f"""
-=========================================
-DATAOPS CONTROL CENTER - REPORTE DE ESCANEO
-=========================================
-Se evaluaron los umbrales del contenedor {db_id}:
-- [WARNING] Conexiones superan el umbral.
-- [WARNING] El uso de CPU supera el 85%.
-- [CRITICAL] Ocurre un Backup fallido.
-- [CRITICAL] El uso de Disco supera el 90%.
-=========================================
-    """
-    background_tasks.add_task(enviar_correo_alerta, f"Reporte de Escaneo - Motor {db_id}", cuerpo_correo)
-    return {"status": "warning", "message": "Escaneo completado."}
 
 @app.post("/api/connections/register")
 async def register_database(db_config: DatabaseConnection):
@@ -221,7 +220,4 @@ app.include_router(replication_router)
 app.include_router(cache_router)
 app.include_router(backups_router)
 app.include_router(alerts_router)
-app.include_router(databases_router)
 app.include_router(audit_router)
-app.include_router(azure_router)
-app.include_router(telemetry_router)

@@ -1,197 +1,211 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, Typography, Box, Grid, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, MenuItem, Select, FormControl, InputLabel, CircularProgress } from '@mui/material';
+import { Grid, Paper, Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, MenuItem, Select, FormControl, InputLabel, CircularProgress, Alert } from '@mui/material';
 import axios from 'axios';
 
 const Databases = () => {
-  const [schema, setSchema] = useState({});
-  const [selectedTable, setSelectedTable] = useState('');
-  const [injectRecords, setInjectRecords] = useState(500);
-  const [sqlQuery, setSqlQuery] = useState('');
-  const [queryResults, setQueryResults] = useState([]);
-  const [queryColumns, setQueryColumns] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [connections, setConnections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Estado para la ejecución de consultas
+  const [selectedDb, setSelectedDb] = useState('');
+  const [queryText, setQueryText] = useState('SELECT * FROM pg_catalog.pg_tables LIMIT 5;');
+  const [queryResult, setQueryResult] = useState(null);
+  const [queryLoading, setQueryLoading] = useState(false);
+  const [queryError, setQueryError] = useState('');
+
+  // Nuevo Motor State
+  const [formData, setFormData] = useState({
+    nombre: '', motor: 'PostgreSQL', host: '', port: '5432', database_name: '', user_name: '', password: ''
+  });
+  const [registerStatus, setRegisterStatus] = useState({ type: '', message: '' });
 
   useEffect(() => {
-    fetchSchema();
+    fetchConnections();
   }, []);
 
-  const fetchSchema = async () => {
+  const fetchConnections = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/databases/schema');
-      setSchema(response.data.schema);
-    } catch (error) {
-      console.error("Error fetching schema", error);
-    }
-  };
-
-  const handleInject = async () => {
-    if (!selectedTable) {
-      setMessage("Selecciona una tabla primero.");
-      return;
-    }
-    setLoading(true);
-    setMessage(`Inyectando ${injectRecords} registros en ${selectedTable}...`);
-    try {
-      const response = await axios.post('http://localhost:8000/api/databases/inject', {
-        table_name: selectedTable,
-        num_records: Number(injectRecords)
-      });
-      setMessage(response.data.message);
-    } catch (error) {
-      setMessage(`Error: ${error.response?.data?.detail || error.message}`);
-    }
-    setLoading(false);
-  };
-
-  const handleQuery = async () => {
-    if (!sqlQuery.trim()) return;
-    setLoading(true);
-    setMessage("Ejecutando consulta...");
-    try {
-      const response = await axios.post('http://localhost:8000/api/databases/query', {
-        query: sqlQuery
-      });
-      
-      setMessage(response.data.message);
-      
-      if (response.data.records && response.data.records.length > 0) {
-        setQueryResults(response.data.records);
-        setQueryColumns(Object.keys(response.data.records[0]));
-      } else {
-        setQueryResults([]);
-        setQueryColumns([]);
+      const response = await axios.get('http://localhost:8000/api/connections/');
+      if (response.data.status === 'success') {
+        setConnections(response.data.connections);
+        if (response.data.connections.length > 0) {
+          setSelectedDb(response.data.connections[0].id);
+        }
       }
-    } catch (error) {
-      setMessage(`Error SQL: ${error.response?.data?.detail || error.message}`);
-      setQueryResults([]);
-      setQueryColumns([]);
+    } catch (err) {
+      setError('No se pudieron cargar las conexiones. Verifica el backend.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    setRegisterStatus({ type: 'info', message: 'Registrando...' });
+    try {
+      const response = await axios.post('http://localhost:8000/api/connections/', formData);
+      setRegisterStatus({ type: 'success', message: response.data.message });
+      fetchConnections(); // Recargar la lista
+      // Limpiar formulario básico
+      setFormData({ ...formData, nombre: '', database_name: '', password: '' });
+    } catch (error) {
+      setRegisterStatus({ type: 'error', message: error.response?.data?.detail || 'Error al registrar el motor.' });
+    }
+  };
+
+  const handleExecuteQuery = async () => {
+    if (!selectedDb || !queryText.trim()) return;
+
+    setQueryLoading(true);
+    setQueryError('');
+    setQueryResult(null);
+
+    try {
+      const response = await axios.post('http://localhost:8000/api/queries/execute', {
+        db_id: selectedDb,
+        query_text: queryText
+      });
+      setQueryResult(response.data);
+    } catch (err) {
+      setQueryError(err.response?.data?.detail || 'Error ejecutando la consulta');
+    } finally {
+      setQueryLoading(false);
+    }
   };
 
   return (
-    <Box>
-      <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold' }}>Gestión de Bases de Datos</Typography>
-      <Grid container spacing={4}>
-        <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, mb: 4 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Inyector de Datos Dinámico</Typography>
-            
-            <FormControl fullWidth margin="dense">
-              <InputLabel>Tabla Destino</InputLabel>
-              <Select
-                value={selectedTable}
-                label="Tabla Destino"
-                onChange={(e) => setSelectedTable(e.target.value)}
-              >
-                {Object.keys(schema).map(t => (
-                  <MenuItem key={t} value={t}>{t}</MenuItem>
+    <Grid container spacing={4}>
+
+      {/* SECCIÓN IZQUIERDA: LISTA Y REGISTRO */}
+      <Grid item xs={12} lg={4}>
+        <Paper sx={{ p: 4, mb: 4 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3 }}>Motores Conectados</Typography>
+          {loading ? (
+            <CircularProgress />
+          ) : error ? (
+            <Alert severity="error">{error}</Alert>
+          ) : connections.length === 0 ? (
+            <Typography>No hay motores registrados aún.</Typography>
+          ) : (
+            <List sx={{ width: '100%', bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+              {connections.map((conn) => (
+                <ListItem key={conn.id} sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                  <ListItemText
+                    primary={`${conn.nombre} (${conn.motor})`}
+                    secondary={`${conn.host}:${conn.port} - DB: ${conn.database_name}`}
+                  />
+                  <Chip size="small" label={conn.status} color={conn.status === 'ACTIVE' ? 'success' : 'default'} />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </Paper>
+
+        <Paper sx={{ p: 4 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 3, color: 'primary.main' }}>Añadir Nuevo Motor</Typography>
+          {registerStatus.message && (
+            <Alert severity={registerStatus.type} sx={{ mb: 2 }}>{registerStatus.message}</Alert>
+          )}
+          <form onSubmit={handleRegisterSubmit}>
+            <TextField fullWidth required margin="dense" label="Nombre (Alias)" value={formData.nombre} onChange={(e) => setFormData({...formData, nombre: e.target.value})} size="small" />
+            <FormControl fullWidth margin="dense" size="small">
+              <InputLabel>Motor</InputLabel>
+              <Select value={formData.motor} label="Motor" onChange={(e) => setFormData({...formData, motor: e.target.value})}>
+                <MenuItem value="PostgreSQL">PostgreSQL</MenuItem>
+                <MenuItem value="SQL Server">SQL Server</MenuItem>
+              </Select>
+            </FormControl>
+            <Grid container spacing={2}>
+              <Grid item xs={8}>
+                <TextField fullWidth required margin="dense" label="Host / IP" value={formData.host} onChange={(e) => setFormData({...formData, host: e.target.value})} size="small" />
+              </Grid>
+              <Grid item xs={4}>
+                <TextField fullWidth required margin="dense" label="Puerto" value={formData.port} onChange={(e) => setFormData({...formData, port: e.target.value})} size="small" />
+              </Grid>
+            </Grid>
+            <TextField fullWidth required margin="dense" label="Base de Datos" value={formData.database_name} onChange={(e) => setFormData({...formData, database_name: e.target.value})} size="small" />
+            <TextField fullWidth required margin="dense" label="Usuario" value={formData.user_name} onChange={(e) => setFormData({...formData, user_name: e.target.value})} size="small" />
+            <TextField fullWidth required margin="dense" label="Contraseña" type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} size="small" />
+            <Button type="submit" variant="contained" fullWidth sx={{ mt: 3 }}>Guardar y Encriptar</Button>
+          </form>
+        </Paper>
+      </Grid>
+
+      {/* SECCIÓN DERECHA: EJECUCIÓN DE CONSULTAS */}
+      <Grid item xs={12} lg={8}>
+        <Paper sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2 }}>Consola de Ejecución SQL</Typography>
+
+          <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+            <FormControl sx={{ minWidth: 200 }} size="small">
+              <InputLabel>Target Database</InputLabel>
+              <Select value={selectedDb} label="Target Database" onChange={(e) => setSelectedDb(e.target.value)}>
+                {connections.map((conn) => (
+                  <MenuItem key={conn.id} value={conn.id}>{conn.nombre}</MenuItem>
                 ))}
               </Select>
             </FormControl>
-
-            <TextField 
-              fullWidth 
-              margin="dense" 
-              label="Cantidad de Registros" 
-              type="number" 
-              value={injectRecords}
-              onChange={(e) => setInjectRecords(e.target.value)}
-              sx={{ mt: 2 }} 
-            />
-            
-            <Button 
-              variant="contained" 
-              color="secondary" 
-              fullWidth 
-              sx={{ mt: 3 }}
-              onClick={handleInject}
-              disabled={loading}
-            >
-              {loading ? <CircularProgress size={24} /> : "Inyectar Datos Reales"}
+            <Button variant="contained" color="secondary" onClick={handleExecuteQuery} disabled={!selectedDb || queryLoading}>
+              {queryLoading ? 'Ejecutando...' : 'Ejecutar Consulta'}
             </Button>
-            
-            {message && <Typography variant="body2" sx={{ mt: 2, color: 'success.main' }}>{message}</Typography>}
-          </Paper>
+          </Box>
 
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Explorador de Esquemas</Typography>
-            {Object.keys(schema).length === 0 ? (
-              <Typography variant="body2" color="text.secondary">Cargando esquema...</Typography>
-            ) : (
-              <Box sx={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {Object.entries(schema).map(([table, cols]) => (
-                  <Box key={table} sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" color="primary">{table}</Typography>
-                    <ul style={{ margin: 0, paddingLeft: '20px', color: '#8ca3ba', fontSize: '14px' }}>
-                      {cols.map((col, i) => (
-                        <li key={i}>{col.column} ({col.type})</li>
-                      ))}
-                    </ul>
-                  </Box>
-                ))}
-              </Box>
+          <TextField
+            multiline
+            rows={5}
+            fullWidth
+            variant="outlined"
+            placeholder="Escribe tu consulta SQL aquí (ej. SELECT * FROM tabla)"
+            value={queryText}
+            onChange={(e) => setQueryText(e.target.value)}
+            sx={{ mb: 3, fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.4)' }}
+          />
+
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>Resultados:</Typography>
+
+          <Box sx={{ flexGrow: 1, bgcolor: 'rgba(17, 25, 40, 0.95)', borderRadius: '8px', p: 2, overflow: 'auto', minHeight: '300px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            {queryError && <Alert severity="error" sx={{ mb: 2 }}>{queryError}</Alert>}
+
+            {queryResult && queryResult.message && (
+              <Typography variant="body2" sx={{ color: 'success.main', mb: 2 }}>{queryResult.message}</Typography>
             )}
-          </Paper>
-        </Grid>
-        
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>Consola SQL Integrada</Typography>
-            <TextField
-              multiline
-              rows={6}
-              fullWidth
-              variant="outlined"
-              placeholder="Escribe tu consulta SQL aquí... Ej: SELECT * FROM connections LIMIT 10;"
-              value={sqlQuery}
-              onChange={(e) => setSqlQuery(e.target.value)}
-              sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.3)', borderRadius: 1 }}
-            />
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="contained" color="primary" onClick={handleQuery} disabled={loading}>
-                Ejecutar Consulta
-              </Button>
-            </Box>
-            
-            <Typography variant="subtitle1" sx={{ mt: 4, mb: 2 }}>Resultados</Typography>
-            <TableContainer sx={{ flexGrow: 1, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: '12px', maxHeight: '400px' }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    {queryColumns.map((col) => (
-                      <TableCell key={col} sx={{ fontWeight: 'bold', bgcolor: 'rgba(17, 25, 40, 0.9)' }}>
-                        {col}
-                      </TableCell>
-                    ))}
-                    {queryColumns.length === 0 && <TableCell>#</TableCell>}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {queryResults.length > 0 ? (
-                    queryResults.map((row, i) => (
-                      <TableRow key={i} hover>
-                        {queryColumns.map((col) => (
-                          <TableCell key={col}>{String(row[col])}</TableCell>
+
+            {queryResult && queryResult.data && queryResult.data.length > 0 && (
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      {Object.keys(queryResult.data[0]).map((key) => (
+                        <TableCell key={key} sx={{ color: 'primary.main', fontWeight: 'bold' }}>{key}</TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {queryResult.data.map((row, index) => (
+                      <TableRow key={index} hover>
+                        {Object.values(row).map((val, i) => (
+                          <TableCell key={i} sx={{ color: '#cbd5e1' }}>{String(val)}</TableCell>
                         ))}
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={queryColumns.length || 1} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                        Ejecuta una consulta para ver los resultados
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {queryResult && queryResult.data && queryResult.data.length === 0 && (
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>La consulta se ejecutó correctamente pero no devolvió filas.</Typography>
+            )}
+          </Box>
+        </Paper>
       </Grid>
-    </Box>
+
+    </Grid>
   );
 };
+
+// Necesario importar List, ListItem, ListItemText, Chip para la lista de bases de datos
+import { List, ListItem, ListItemText, Chip } from '@mui/material';
 
 export default Databases;

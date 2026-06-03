@@ -1,5 +1,42 @@
 from App.Database.Connection import get_db_connection
 from psycopg2.extras import RealDictCursor
+import threading
+
+# Variable global para almacenar alertas de lógica de negocio (en memoria)
+# En una aplicación real, esto iría a una tabla de base de datos o Redis
+custom_alerts_state = []
+alerts_lock = threading.Lock()
+
+def add_custom_alert(name: str, severity: str, summary: str, description: str, container: str = "Backend"):
+    """Añade una alerta generada por la lógica de negocio."""
+    with alerts_lock:
+        # Evitar duplicados exactos
+        for alert in custom_alerts_state:
+            if alert['name'] == name and alert['description'] == description:
+                return
+
+        custom_alerts_state.append({
+            "name": name,
+            "state": "firing", # Las alertas de negocio se consideran activas inmediatamente
+            "severity": severity,
+            "container": container,
+            "summary": summary,
+            "description": description
+        })
+
+def clear_custom_alerts(alert_name: str = None):
+    """Limpia las alertas personalizadas. Si se especifica alert_name, solo borra esa."""
+    global custom_alerts_state
+    with alerts_lock:
+        if alert_name:
+            custom_alerts_state = [a for a in custom_alerts_state if a['name'] != alert_name]
+        else:
+            custom_alerts_state.clear()
+
+def get_custom_alerts():
+    """Devuelve la lista actual de alertas personalizadas."""
+    with alerts_lock:
+        return list(custom_alerts_state)
 
 def scan_and_generate_alerts(db_id: int, threshold_ms: float = 50.0):
     """Escanea las transacciones y genera alertas si superan el tiempo de espera permitido."""
@@ -35,6 +72,9 @@ def scan_and_generate_alerts(db_id: int, threshold_ms: float = 50.0):
                                VALUES (%s, 'SLOW_QUERY', %s, 'HIGH')
                                """, (db_id, description))
                 alerts_created += 1
+
+                # También la añadimos al estado en memoria para el dashboard
+                add_custom_alert("Transacción Lenta", "warning", "Tiempo de espera excesivo", description)
 
         conn.commit()
 

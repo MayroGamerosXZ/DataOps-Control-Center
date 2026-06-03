@@ -1,0 +1,29 @@
+groups:
+  - name: DataOpsAlerts
+    rules:
+      - alert: AltaCargaCPU
+        expr: sum(rate(container_cpu_usage_seconds_total{name=~"db_.*|postgres.*"}[2m])) by (name) * 100 > 85
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de CPU > 85% en {{ $labels.name }}"
+          description: "El contenedor {{ $labels.name }} ha superado el 85% de uso de CPU durante más de 1 minuto."
+
+      - alert: UsoDeDiscoCritico
+        expr: (container_fs_usage_bytes{name=~"db_.*|postgres.*"} / container_fs_limit_bytes{name=~"db_.*|postgres.*"}) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Uso de Disco > 90% en {{ $labels.name }}"
+          description: "El espacio en disco para {{ $labels.name }} está por encima del 90%. Se requiere acción inmediata."
+
+      - alert: MemoriaElevada
+        expr: sum(container_memory_usage_bytes{name=~"db_.*|postgres.*"}) by (name) / 1024 / 1024 > 800
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Uso de memoria alto en {{ $labels.name }}"
+          description: "El contenedor {{ $labels.name }} está usando más de 800MB de RAM durante más de 2 minutos."

@@ -2,9 +2,28 @@ from fastapi import APIRouter, HTTPException
 from App.Models.Schemas import ConnectionCreate
 from App.Database.Connection import get_db_connection
 from App.Security import encrypt_password
+from psycopg2.extras import RealDictCursor
 
 # Creamos un "Router" para mantener organizadas las rutas de conexiones
 router = APIRouter(prefix="/api/connections", tags=["Registro de Motores"])
+
+@router.get("/")
+def get_all_connections():
+    """Obtiene una lista de todos los motores de base de datos registrados."""
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Error conectando a la BD de control")
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # Seleccionamos todos los campos EXCEPTO la contraseña encriptada por seguridad
+        cursor.execute("SELECT id, nombre, motor, host, port, database_name, user_name, status FROM CONNECTIONS ORDER BY id ASC")
+        connections = cursor.fetchall()
+        return {"status": "success", "connections": connections}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+        conn.close()
 
 @router.post("/")
 def register_connection(conn_data: ConnectionCreate):

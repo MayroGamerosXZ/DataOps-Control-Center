@@ -15,8 +15,27 @@ def get_telemetry_stats():
         
         # 1. Obtener proporciones de estado de auditoría (Exitosos vs Fallidos)
         cursor.execute("""
-            SELECT estado, COUNT(*) as cantidad 
-            FROM AUDIT_LOGS 
+            SELECT estado, SUM(cantidad) as cantidad
+            FROM (
+                SELECT estado, COUNT(*) as cantidad 
+                FROM AUDIT_LOGS 
+                GROUP BY estado
+                
+                UNION ALL
+                
+                SELECT 
+                    CASE 
+                        WHEN operacion = 'ERROR' THEN 'Error' 
+                        ELSE 'Completado' 
+                    END as estado,
+                    COUNT(*) as cantidad
+                FROM tx_log
+                GROUP BY 
+                    CASE 
+                        WHEN operacion = 'ERROR' THEN 'Error' 
+                        ELSE 'Completado' 
+                    END
+            ) as combined_estados
             GROUP BY estado
         """)
         audit_stats = cursor.fetchall()
@@ -26,11 +45,22 @@ def get_telemetry_stats():
         fallidos = sum(row['cantidad'] for row in audit_stats if row['estado'] == 'Error')
         otros = sum(row['cantidad'] for row in audit_stats if row['estado'] not in ('Completado', 'Error'))
         
-        # 2. Obtener motores y cantidad de operaciones
+        # 2. Obtener motores y cantidad de operaciones combinadas (Audit + Stress Test)
         cursor.execute("""
-            SELECT motor_afectado, COUNT(*) as cantidad 
-            FROM AUDIT_LOGS 
-            WHERE motor_afectado IS NOT NULL 
+            SELECT motor_afectado, SUM(cantidad) as cantidad
+            FROM (
+                SELECT motor_afectado, COUNT(*) as cantidad 
+                FROM AUDIT_LOGS 
+                WHERE motor_afectado IS NOT NULL 
+                GROUP BY motor_afectado
+                
+                UNION ALL
+                
+                SELECT c.engine as motor_afectado, COUNT(*) as cantidad
+                FROM tx_log t
+                JOIN CONNECTIONS c ON t.db_id = c.id
+                GROUP BY c.engine
+            ) as combined
             GROUP BY motor_afectado
         """)
         motor_stats = cursor.fetchall()

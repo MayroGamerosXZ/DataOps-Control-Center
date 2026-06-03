@@ -129,7 +129,8 @@ services:
       - dataops_net
     volumes:
       - prometheus_data:/prometheus
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml # ACÁ: Mapeo de tu archivo de configuración
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./grafana_alerts.yml:/etc/prometheus/grafana_alerts.yml
     deploy:
       resources:
         limits:

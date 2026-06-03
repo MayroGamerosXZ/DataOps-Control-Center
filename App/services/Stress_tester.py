@@ -10,7 +10,7 @@ from App.Security import decrypt_password
 OPERATIONS = ['INSERT', 'UPDATE', 'DELETE', 'SELECT']
 
 def worker_thread(session_id, db_config):
-    """Simula un usuario ejecutando una transacción aleatoria."""
+    """Simula un usuario ejecutando carga sostenida por 15 segundos para grafana."""
     control_conn = get_db_connection()
     target_conn = None
 
@@ -25,27 +25,27 @@ def worker_thread(session_id, db_config):
         )
         target_cursor = target_conn.cursor()
 
-        operacion = random.choice(OPERATIONS)
         inicio = datetime.now()
         start_time = time.time()
-
-        # Simular la operación mixta en una tabla temporal
-        if operacion == 'INSERT':
+        
+        # Bucle de carga sostenida por 15 segundos
+        end_time = time.time() + 15
+        operacion = 'MIXTA'
+        
+        while time.time() < end_time:
+            # 1. Operación pesada de CPU (Cross Join en memoria)
+            target_cursor.execute("SELECT count(*) FROM generate_series(1, 1000) a, generate_series(1, 100) b")
+            
+            # 2. Operaciones DML normales
             target_cursor.execute("INSERT INTO stress_table (val) VALUES (%s)", (random.randint(1, 1000),))
-        elif operacion == 'UPDATE':
             target_cursor.execute("UPDATE stress_table SET val = %s WHERE id = (SELECT id FROM stress_table ORDER BY RANDOM() LIMIT 1)", (random.randint(1, 1000),))
-        elif operacion == 'DELETE':
-            target_cursor.execute("DELETE FROM stress_table WHERE id = (SELECT id FROM stress_table ORDER BY RANDOM() LIMIT 1)")
-        elif operacion == 'SELECT':
-            target_cursor.execute("SELECT * FROM stress_table ORDER BY RANDOM() LIMIT 10")
-
-        target_conn.commit()
+            target_conn.commit()
 
         fin = datetime.now()
         wait_time = (time.time() - start_time) * 1000
-        lock_type = 'SHARED' if operacion == 'SELECT' else 'EXCLUSIVE'
+        lock_type = 'EXCLUSIVE'
 
-        # Registrar en la BD de Control (TX_LOG)
+        # Registrar en la BD de Control (TX_LOG) una sola vez por sesión
         control_cursor = control_conn.cursor()
         control_cursor.execute("""
                                INSERT INTO TX_LOG (db_id, session_id, operacion, inicio, fin, wait_time, lock_type)
@@ -61,7 +61,7 @@ def worker_thread(session_id, db_config):
             control_cursor.execute("""
                                    INSERT INTO TX_LOG (db_id, session_id, operacion, inicio, fin, wait_time, lock_type)
                                    VALUES (%s, %s, %s, %s, %s, %s, 'TIMEOUT')
-                                   """, (db_config['id'], session_id, operacion, inicio, fin, 0))
+                                   """, (db_config['id'], session_id, 'ERROR', inicio, fin, 0))
             control_conn.commit()
     finally:
         if target_conn:
@@ -69,7 +69,7 @@ def worker_thread(session_id, db_config):
         if control_conn:
             control_conn.close()
 
-def run_stress_test(db_config, num_users=100):
+def run_stress_test(db_config, num_users=20):
     """Prepara el entorno y lanza los hilos concurrentes."""
     try:
         # Preparar tabla dummy para el ataque
